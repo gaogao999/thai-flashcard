@@ -3618,8 +3618,22 @@ const CHS=20;
 // ── ストレージ ──────────────────────────────────────────
 const ls=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}};
 const ss=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}};
+// 単語データ(RAW)は大容量になるためIndexedDBに保存（localStorageの約5MB制限を回避）
+let _idb=null;
+function idbOpen(){
+  return new Promise((res,rej)=>{
+    if(_idb)return res(_idb);
+    if(typeof indexedDB==='undefined')return rej(new Error('no idb'));
+    const r=indexedDB.open('tapDB',1);
+    r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains('kv'))r.result.createObjectStore('kv');};
+    r.onsuccess=()=>{_idb=r.result;res(_idb);};
+    r.onerror=()=>rej(r.error);
+  });
+}
+function idbGet(k){return idbOpen().then(db=>new Promise((res,rej)=>{const q=db.transaction('kv','readonly').objectStore('kv').get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error);}));}
+function idbSet(k,v){return idbOpen().then(db=>new Promise((res,rej)=>{const t=db.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=()=>res(true);t.onerror=()=>rej(t.error);}));}
 const DEFAULT_RAW=[{"id": "49", "thai": "ทาง", "kana": "ターン", "roman": "thaaŋ", "meaning": "道", "pos": "名詞", "level": "A1", "score": 35, "ex1_thai": "ทางนี้ดีมาก", "ex1_kana": "ターン ニー ディー マーク", "ex1_roman": "thaaŋ níi dii mâak", "ex1_meaning": "この道はとても良い", "ex1_thai_words": "ทาง|นี้|ดีมาก"}, {"id": "70", "thai": "สบายดีไหม", "kana": "サバーイ ディー マイ", "roman": "sabaay dii máy", "meaning": "お元気ですか？", "pos": "挨拶", "level": "A1", "score": 35}, {"id": "71", "thai": "สบายดี", "kana": "サバーイ ディー", "roman": "sabaay dii", "meaning": "元気である", "pos": "形容詞", "level": "A1", "score": 35}, {"id": "72", "thai": "ขอบคุณ", "kana": "コープ クン", "roman": "khɔ̀ɔp khun", "meaning": "ありがとう", "pos": "挨拶", "level": "A1", "score": 35}, {"id": "73", "thai": "ขอโทษ", "kana": "コー トート", "roman": "khɔ̌ɔ thôot", "meaning": "ごめんなさい", "pos": "挨拶", "level": "A1", "score": 35}, {"id": "74", "thai": "ผม", "kana": "ポム", "roman": "phǒm", "meaning": "私[男性]", "pos": "代名詞", "level": "A1", "score": 35}, {"id": "75", "thai": "เรา", "kana": "ラオ", "roman": "raw", "meaning": "私たち", "pos": "代名詞", "level": "A1", "score": 35}, {"id": "76", "thai": "เขา", "kana": "カオ", "roman": "khǎw", "meaning": "彼", "pos": "代名詞", "level": "A1", "score": 35}, {"id": "77", "thai": "นี่", "kana": "ニー", "roman": "nîi", "meaning": "これ", "pos": "代名詞", "level": "A1", "score": 35}, {"id": "78", "thai": "นี้", "kana": "ニー", "roman": "níi", "meaning": "この〜", "pos": "名詞", "level": "A1", "score": 35}, {"id": "79", "thai": "ชื่อ", "kana": "チュー", "roman": "chʉ̂ʉ", "meaning": "名前", "pos": "名詞", "level": "A1", "score": 35}, {"id": "80", "thai": "ครอบครัว", "kana": "クロープ クルア", "roman": "khrɔ̂ɔp khrua", "meaning": "家族", "pos": "名詞", "level": "A1", "score": 35}, {"id": "81", "thai": "พ่อแม่", "kana": "ポー メー", "roman": "phɔ̂ɔ mɛ̂ɛ", "meaning": "両親", "pos": "名詞", "level": "A1", "score": 35}, {"id": "82", "thai": "พ่อ", "kana": "ポー", "roman": "phɔ̂ɔ", "meaning": "父", "pos": "名詞", "level": "A1", "score": 35}, {"id": "83", "thai": "ตา", "kana": "ター", "roman": "taa", "meaning": "目", "pos": "名詞", "level": "A1", "score": 35}, {"id": "84", "thai": "แม่", "kana": "メー", "roman": "mɛ̂ɛ", "meaning": "母", "pos": "名詞", "level": "A1", "score": 35}, {"id": "85", "thai": "ลูกสาว", "kana": "ルーク サーオ", "roman": "lûuk sǎaw", "meaning": "娘", "pos": "名詞", "level": "A1", "score": 35}, {"id": "86", "thai": "ใช่", "kana": "チャイ", "roman": "chây", "meaning": "はい", "pos": "動詞", "level": "A1", "score": 35}, {"id": "87", "thai": "ไม่ใช่", "kana": "マイ チャイ", "roman": "mây chây", "meaning": "〜ではない", "pos": "動詞", "level": "A1", "score": 35}, {"id": "88", "thai": "ไม่เป็นไร", "kana": "マイ ペン ライ", "roman": "mây pen ray", "meaning": "大丈夫", "pos": "動詞", "level": "A1", "score": 35}, {"id": "89", "thai": "เท่าไร", "kana": "タオライ", "roman": "thâwrày", "meaning": "いくら", "pos": "副詞", "level": "A1", "score": 35}, {"id": "90", "thai": "ที่ไหน", "kana": "ティー ナイ", "roman": "thîi nǎy", "meaning": "どこ", "pos": "副詞", "level": "A1", "score": 35}, {"id": "91", "thai": "ทำไม", "kana": "タムマイ", "roman": "thammaĭ", "meaning": "なぜ", "pos": "副詞", "level": "A1", "score": 35}, {"id": "92", "thai": "มี", "kana": "ミー", "roman": "mii", "meaning": "持っている", "pos": "動詞", "level": "A1", "score": 35, "ex1_thai": "เขามีหนังสือมาก", "ex1_kana": "カオ ミー ナンスー マーク", "ex1_roman": "khǎw mii nǎŋsʉ̌ʉ mâak", "ex1_meaning": "彼はたくさんの本を持っている", "ex1_thai_words": "เขา|มี|หนังสือ|มาก"}, {"id": "93", "thai": "กิน", "kana": "ギン", "roman": "kin", "meaning": "食べる", "pos": "動詞", "level": "A1", "score": 35, "ex1_thai": "ผมกินข้าวทุกวัน", "ex1_kana": "ポム ギン カーオ トゥック ワン", "ex1_roman": "phǒm kin khâaw thúk wan", "ex1_meaning": "私は毎日ご飯を食べる", "ex1_thai_words": "ผม|กินข้าว|ทุกวัน"}, {"id": "94", "thai": "ดื่ม", "kana": "ドゥーム", "roman": "dʉ̀ʉm", "meaning": "飲む", "pos": "動詞", "level": "A1", "score": 35, "ex1_thai": "หล่อนดื่มน้ำเย็น", "ex1_kana": "ロン ドゥーム ナーム イェン", "ex1_roman": "lɔ̀ɔn dʉ̀ʉm náam yen", "ex1_meaning": "彼女は冷たい水を飲む", "ex1_thai_words": "หล่อน|ดื่ม|น้ำเย็น"}, {"id": "95", "thai": "ไป", "kana": "パイ", "roman": "pay", "meaning": "行く", "pos": "動詞", "level": "A1", "score": 35, "ex1_thai": "เราไปตลาดด้วยกัน", "ex1_kana": "ラオ パイ タラート ドゥアイ ガン", "ex1_roman": "raw pay talàat dûay kan", "ex1_meaning": "私たちは一緒に市場へ行く", "ex1_thai_words": "เรา|ไป|ตลาด|ด้วยกัน"}, {"id": "96", "thai": "มา", "kana": "マー", "roman": "maa", "meaning": "来る", "pos": "動詞", "level": "A1", "score": 35, "ex1_thai": "เขามาโรงเรียน", "ex1_kana": "カオ マー ローンリアン", "ex1_roman": "khǎw maa rooŋrian", "ex1_meaning": "彼は学校に来る", "ex1_thai_words": "เขา|มา|โรงเรียน"}, {"id": "97", "thai": "อยู่", "kana": "ユー", "roman": "yùu", "meaning": "いる", "pos": "動詞", "level": "A1", "score": 35}, {"id": "98", "thai": "ซื้อ", "kana": "スー", "roman": "sʉ́ʉ", "meaning": "買う", "pos": "動詞", "level": "A1", "score": 35}, {"id": "99", "thai": "ขาย", "kana": "カーイ", "roman": "khǎay", "meaning": "売る", "pos": "動詞", "level": "A1", "score": 35}, {"id": "100", "thai": "พูด", "kana": "プート", "roman": "phûut", "meaning": "話す", "pos": "動詞", "level": "A1", "score": 35, "ex1_thai": "เขาพูดภาษาไทยได้", "ex1_kana": "カオ プート パーサー タイ ダーイ", "ex1_roman": "khǎw phûut phaasǎa thay dâay", "ex1_meaning": "彼はタイ語が話せる", "ex1_thai_words": "เขา|พูด|ภาษาไทย|ได้"}, {"id": "101", "thai": "ฟัง", "kana": "ファン", "roman": "faŋ", "meaning": "聞く", "pos": "動詞", "level": "A1", "score": 35}, {"id": "102", "thai": "อ่าน", "kana": "アーン", "roman": "àan", "meaning": "読む", "pos": "動詞", "level": "A1", "score": 35}, {"id": "103", "thai": "เขียน", "kana": "キアン", "roman": "khǐan", "meaning": "書く", "pos": "動詞", "level": "A1", "score": 35}, {"id": "104", "thai": "นอน", "kana": "ノーン", "roman": "nɔɔn", "meaning": "寝る", "pos": "動詞", "level": "A1", "score": 35}, {"id": "105", "thai": "ดู", "kana": "ドゥー", "roman": "duu", "meaning": "見る", "pos": "動詞", "level": "A1", "score": 35}, {"id": "106", "thai": "รู้", "kana": "ルー", "roman": "rúu", "meaning": "知っている", "pos": "動詞", "level": "A1", "score": 35}, {"id": "107", "thai": "เข้าใจ", "kana": "カオ ジャイ", "roman": "khâwcay", "meaning": "わかる", "pos": "動詞", "level": "A1", "score": 35}, {"id": "108", "thai": "ชอบ", "kana": "チョープ", "roman": "chɔ̂ɔp", "meaning": "好きである", "pos": "動詞", "level": "A1", "score": 35, "ex1_thai": "ฉันชอบกินส้มตำ", "ex1_kana": "チャン チョープ ギン ソムタム", "ex1_roman": "chǎn chɔ̂ɔp kin sômtam", "ex1_meaning": "私はソムタムが好きだ", "ex1_thai_words": "ฉัน|ชอบ|กิน|ส้มตำ"}, {"id": "109", "thai": "ต้องการ", "kana": "トーン ガーン", "roman": "tɔ̂ŋkaan", "meaning": "必要とする", "pos": "動詞", "level": "A1", "score": 35}, {"id": "110", "thai": "ได้", "kana": "ダーイ", "roman": "dâay", "meaning": "できる", "pos": "動詞", "level": "A1", "score": 35}, {"id": "111", "thai": "ดี", "kana": "ディー", "roman": "dii", "meaning": "良い", "pos": "形容詞", "level": "A1", "score": 35}, {"id": "112", "thai": "ใหญ่", "kana": "ヤイ", "roman": "yày", "meaning": "大きい", "pos": "形容詞", "level": "A1", "score": 35}, {"id": "113", "thai": "เล็ก", "kana": "レック", "roman": "lék", "meaning": "小さい", "pos": "形容詞", "level": "A1", "score": 35}, {"id": "114", "thai": "ร้อน", "kana": "ローン", "roman": "rɔ́ɔn", "meaning": "暑い", "pos": "形容詞", "level": "A1", "score": 35}, {"id": "115", "thai": "เย็น", "kana": "イェン", "roman": "yen", "meaning": "冷たい", "pos": "形容詞", "level": "A1", "score": 35}, {"id": "116", "thai": "แพง", "kana": "ペーン", "roman": "phɛɛŋ", "meaning": "高い[値段が]", "pos": "形容詞", "level": "A1", "score": 35}, {"id": "117", "thai": "ถูก", "kana": "トゥーク", "roman": "thùuk", "meaning": "安い", "pos": "形容詞", "level": "A1", "score": 35}];
-let RAW=ls('tap_raw',DEFAULT_RAW);
+let RAW=DEFAULT_RAW;let idbOK=true;// RAWはbootRAW()でIndexedDBから非同期読み込み
 let wSt=ls('tap_st',{});
 let strk=ls('tap_streak',{dates:[],best:0,cur:0});
 let slog=ls('tap_slog',{sec:0,words:0,todayIds:[],todayDate:'',wkData:{}});
@@ -3635,7 +3649,17 @@ let cfg={mode:'flip',dir:'thai',order:'random',limit:50,lv:'all',pos:'all'};// �
 })();
 let _t0=Date.now();
 
-function save(){ss('tap_raw',RAW);ss('tap_st',wSt);ss('tap_streak',strk);ss('tap_slog',slog);ss('tap_pref',pref);}
+function save(){if(idbOK)idbSet('tap_raw',RAW).catch(()=>{});else ss('tap_raw',RAW);ss('tap_st',wSt);ss('tap_streak',strk);ss('tap_slog',slog);ss('tap_pref',pref);}
+// 起動時にRAWを読み込む（IDB→旧localStorageから移行→デフォルト）
+async function bootRAW(){
+  try{
+    const v=await idbGet('tap_raw');
+    if(Array.isArray(v)&&v.length){RAW=v;return;}
+    const legacy=localStorage.getItem('tap_raw');// 旧版からの移行
+    if(legacy){try{const arr=JSON.parse(legacy);if(Array.isArray(arr)&&arr.length){RAW=arr;await idbSet('tap_raw',RAW);try{localStorage.removeItem('tap_raw');}catch{}return;}}catch{}}
+    RAW=DEFAULT_RAW;await idbSet('tap_raw',RAW);// 初回
+  }catch(e){idbOK=false;RAW=ls('tap_raw',DEFAULT_RAW);}// IDB非対応時はlocalStorageにフォールバック
+}
 function recStrk(){
   const t=new Date().toISOString().slice(0,10);
   if(!strk.dates.includes(t)){strk.dates.push(t);strk.dates.sort();}
@@ -4033,14 +4057,15 @@ function loadCSV(e){
       const req=['id','thai','kana','roman','meaning','pos','score'];
       const miss=req.filter(k=>!(k in im));if(miss.length){csvSt('列なし: '+miss.join(', '),false);return;}
       const gc=s=>{const n=parseInt(s);if(n>=32)return'A1';if(n>=29)return'A2';if(n>=26)return'B1';if(n>=23)return'B2';if(n>=17)return'C1';return'C2';};
+      // 複数意味は区切り(, ， 、)を「、」に統一して全て保持
+      const norm=s=>(s||'').trim().replace(/\s*[,，]\s*/g,'、').replace(/、+/g,'、').replace(/^、+|、+$/g,'');
+      const gx=(r,k)=>im[k]!=null&&r[im[k]]?r[im[k]]:'';// 列があり値があれば取得
       const nw=rows.slice(1).map(r=>{const sc=parseInt(r[im.score])||0;
-        return{id:r[im.id],thai:r[im.thai],kana:r[im.kana],roman:r[im.roman],
-          meaning:(r[im.meaning]||'').split('、')[0].split(',')[0].slice(0,30),
-          pos:r[im.pos]||'その他',level:gc(sc),score:sc,
-          ex1_thai:im.ex1_thai!=null?r[im.ex1_thai]:'',
-          ex1_kana:im.ex1_kana!=null?r[im.ex1_kana]:'',
-          ex1_meaning:im.ex1_meaning!=null?r[im.ex1_meaning]:'',
-          ex1_thai_words:im.ex1_thai_words!=null?r[im.ex1_thai_words]:''};
+        const o={id:r[im.id],thai:r[im.thai],kana:im.kana!=null?r[im.kana]:'',roman:im.roman!=null?r[im.roman]:'',
+          meaning:norm(r[im.meaning]),pos:r[im.pos]||'その他',level:gc(sc),score:sc};
+        // 例文 ex1/ex2/ex3 を取り込む（存在する項目のみ）
+        ['ex1','ex2','ex3'].forEach(p=>{['_thai','_kana','_roman','_meaning','_thai_words'].forEach(s=>{const v=gx(r,p+s);if(v)o[p+s]=v;});});
+        return o;
       }).filter(w=>w.thai&&w.meaning);
       if(!nw.length){csvSt('単語なし',false);return;}
       RAW=nw;wSt={};save();document.getElementById('word-cnt').textContent=RAW.length;
@@ -4136,11 +4161,14 @@ function renderDictList(res,q){
     const st=getSt(w.id);
     const spk='<button class="spk" onclick="speak(\''+(w.thai||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L13 19V5L7.5 9.5z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg></button>';
     let ex='';
-    if(w.ex1_thai){
-      ex='<div class="dict-ex"><div class="dict-ex-thai">'+esc(w.ex1_thai)+'</div>'
-        +(w.ex1_kana?'<div>'+esc(w.ex1_kana)+'</div>':'')
-        +(w.ex1_meaning?'<div>'+esc(w.ex1_meaning)+'</div>':'')+'</div>';
-    }
+    ['ex1','ex2','ex3'].forEach(p=>{
+      const th=w[p+'_thai'];if(!th)return;
+      const read=w[p+'_kana']||w[p+'_roman']||'';// カナ優先・無ければローマ字
+      const mn=w[p+'_meaning']||'';
+      ex+='<div class="dict-ex"><div class="dict-ex-thai">'+esc(th)+'</div>'
+        +(read?'<div>'+esc(read)+'</div>':'')
+        +(mn?'<div>'+esc(mn)+'</div>':'')+'</div>';
+    });
     return '<div class="dict-card">'
       +'<div class="dict-head"><div class="dict-thai">'+esc(w.thai)+'</div>'+spk+'</div>'
       +'<div class="dict-read">'+esc(w.kana||'')+(w.roman?' ・ '+esc(w.roman):'')+'</div>'
@@ -4611,8 +4639,11 @@ function renderDash(){
 if(speechSynthesis.onvoiceschanged!==undefined)speechSynthesis.onvoiceschanged=()=>{};
 window.addEventListener('beforeunload',saveSec);
 window.addEventListener('visibilitychange',()=>{if(document.hidden)saveSec();});
-if(!pref.onboarded){document.getElementById('ob-ov').style.display='flex';}
-else{switchTab('home');}
+// RAWをIndexedDBから読み込んでから起動
+bootRAW().then(()=>{
+  if(!pref.onboarded){document.getElementById('ob-ov').style.display='flex';}
+  else{switchTab('home');}
+});
 
 // ── 永続ストレージを要求（ブラウザの自動削除を抑止）──
 if(navigator.storage&&navigator.storage.persist){
