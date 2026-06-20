@@ -3495,6 +3495,14 @@ svg{display:block}
   <div class="set-row"><span class="set-lbl">ブックマーク</span><span class="set-val" id="s-bm"></span></div>
   <div class="set-row" style="cursor:pointer" onclick="resetAll()"><span class="set-lbl set-del">進捗をリセット</span><span class="set-val">›</span></div>
   <div class="csv-area"><label class="csv-btn" for="csv-in2"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-2px;margin-right:6px"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>別のCSVを読み込む</label><input type="file" id="csv-in2" accept=".csv" style="display:none" onchange="loadCSV(event)"></div>
+  <div class="csv-area" style="border-top:none;padding-top:0">
+    <div style="font-size:12px;font-weight:700;color:var(--ink3);margin-bottom:4px">バックアップ</div>
+    <div style="font-size:11px;color:var(--ink4);line-height:1.6;margin-bottom:12px">単語と学習の進捗をMarkdownファイルに保存できます。<br>ブラウザの履歴やサイトデータを消す前に保存しておけば、いつでも復元できます。</div>
+    <button class="csv-btn" style="width:100%;justify-content:center" onclick="exportMD()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-2px;margin-right:6px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>バックアップを保存（.md）</button>
+    <label class="csv-btn" for="bk-in" style="width:100%;justify-content:center;margin-top:10px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-2px;margin-right:6px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 9l5-5 5 5"></path><path d="M12 4v12"></path></svg>バックアップから復元</label>
+    <input type="file" id="bk-in" accept=".md,.markdown,.txt,text/markdown" style="display:none" onchange="importMD(event)">
+    <div id="bk-st" style="font-size:11px;text-align:center;margin-top:8px"></div>
+  </div>
 </div>
 
 <!-- 学習設定モーダル（開始前 or ⚙️） -->
@@ -3989,6 +3997,57 @@ function loadCSV(e){
 }
 function csvSt(msg,ok){const el=document.getElementById('csv-st');el.style.color=ok?'var(--good)':'var(--bad)';el.textContent=msg;}
 
+// ── バックアップ（Markdown）────────────────────────────
+function bkSt(msg,ok){const el=document.getElementById('bk-st');if(!el)return;el.style.color=ok?'var(--good)':'var(--bad)';el.textContent=msg;}
+function exportMD(){
+  try{
+    const now=new Date();const pad=n=>(''+n).padStart(2,'0');
+    const ts=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate())+' '+pad(now.getHours())+':'+pad(now.getMinutes());
+    const fn='thai-flashcard-backup-'+now.getFullYear()+pad(now.getMonth()+1)+pad(now.getDate())+'-'+pad(now.getHours())+pad(now.getMinutes())+'.md';
+    const data={v:1,exportedAt:now.toISOString(),raw:RAW,st:wSt,streak:strk,slog:slog,pref:pref};
+    const esc=s=>(''+(s==null?'':s)).replace(/\|/g,'\\|').replace(/\r?\n/g,' ');
+    let md='# タイ語フラッシュカード バックアップ\n\n';
+    md+='- 保存日時: '+ts+'\n- 単語数: '+RAW.length+'\n\n';
+    md+='> ⚠️ このファイルがあれば、履歴やサイトデータを消してもここから復元できます。大切に保管してください。\n\n';
+    md+='## 学習データ（復元用・この部分は編集しないでください）\n\n';
+    md+='```json\n'+JSON.stringify(data)+'\n```\n\n';
+    md+='## 単語一覧（読みやすさ用）\n\n';
+    md+='| ID | タイ語 | カナ | 発音 | 意味 | 品詞 | レベル | スコア |\n';
+    md+='|---|---|---|---|---|---|---|---|\n';
+    RAW.forEach(w=>{md+='| '+esc(w.id)+' | '+esc(w.thai)+' | '+esc(w.kana)+' | '+esc(w.roman)+' | '+esc(w.meaning)+' | '+esc(w.pos)+' | '+esc(w.level)+' | '+esc(w.score)+' |\n';});
+    const blob=new Blob([md],{type:'text/markdown;charset=utf-8'});
+    const url=URL.createObjectURL(blob);const a=document.createElement('a');
+    a.href=url;a.download=fn;document.body.appendChild(a);a.click();document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    bkSt('保存しました（'+RAW.length+'件）',true);
+  }catch(err){bkSt('保存エラー: '+err.message,false);}
+}
+function importMD(e){
+  const file=e.target.files[0];if(!file)return;
+  if(!confirm('バックアップから復元すると、現在の単語と進捗は上書きされます。よろしいですか？')){e.target.value='';return;}
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{
+      let txt=ev.target.result;if(txt.charCodeAt(0)===0xFEFF)txt=txt.slice(1);
+      const m=txt.match(/```json\s*([\s\S]*?)```/);
+      if(!m){bkSt('復元用データが見つかりません',false);return;}
+      const data=JSON.parse(m[1].trim());
+      if(!data.raw||!Array.isArray(data.raw)||!data.raw.length){bkSt('単語データがありません',false);return;}
+      RAW=data.raw;
+      if(data.st&&typeof data.st==='object')wSt=data.st;
+      if(data.streak&&typeof data.streak==='object')strk=data.streak;
+      if(data.slog&&typeof data.slog==='object')slog=data.slog;
+      if(data.pref&&typeof data.pref==='object')pref=data.pref;
+      save();
+      const wc=document.getElementById('word-cnt');if(wc)wc.textContent=RAW.length;
+      bkSt('復元しました（'+RAW.length+'件）',true);
+      renderSettings();renderHome();
+    }catch(err){bkSt('復元エラー: '+err.message,false);}
+  };
+  r.readAsText(file,'UTF-8');
+  e.target.value='';
+}
+
 // ── ホーム ──────────────────────────────────────────────
 function renderHome(){
   const tot=RAW.length,lnd=totLnd(),pct=tot>0?Math.round(lnd/tot*100):0;
@@ -4438,6 +4497,11 @@ window.addEventListener('beforeunload',saveSec);
 window.addEventListener('visibilitychange',()=>{if(document.hidden)saveSec();});
 if(!pref.onboarded){document.getElementById('ob-ov').style.display='flex';}
 else{switchTab('home');}
+
+// ── 永続ストレージを要求（ブラウザの自動削除を抑止）──
+if(navigator.storage&&navigator.storage.persist){
+  navigator.storage.persisted().then(p=>{if(!p)navigator.storage.persist().catch(()=>{});}).catch(()=>{});
+}
 
 // ── PWA: Service Worker登録 ──
 if('serviceWorker' in navigator){
