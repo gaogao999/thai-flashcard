@@ -3487,6 +3487,9 @@ svg{display:block}
 <div id="scr-settings" style="display:none;flex-direction:column;width:100%;flex:1;padding-bottom:80px">
   <div class="set-row"><span class="set-lbl">1日の目標</span><select class="set-sel" id="s-goal" onchange="savePrefs()"><option value="10">10語</option><option value="20">20語</option><option value="50">50語</option><option value="100">100語</option></select></div>
   <div class="set-row"><span class="set-lbl">制限時間</span><select class="set-sel" id="s-tmr" onchange="savePrefs()"><option value="0">なし</option><option value="5">5秒</option><option value="10">10秒</option><option value="15">15秒</option><option value="30">30秒</option></select></div>
+  <div class="set-row"><span class="set-lbl">「覚えた」までの連続正解</span><select class="set-sel" id="s-mastern" onchange="savePrefs()"><option value="1">1回</option><option value="2">2回</option><option value="3">3回</option><option value="4">4回</option><option value="5">5回</option></select></div>
+  <div class="set-row"><span class="set-lbl">間違えたとき</span><select class="set-sel" id="s-wrong" onchange="savePrefs()"><option value="reset">苦手に戻す（厳しい）</option><option value="down">1段階下げる（緩い）</option></select></div>
+  <div style="font-size:11px;color:var(--ink4);padding:6px 14px 12px;line-height:1.6">連続で正解した回数が設定値に達すると「覚えた」と判定します。間違えると、設定に応じて苦手に戻すか1段階だけ下げます。回数を変更すると現在の判定も再計算されます。</div>
   <div class="set-row"><span class="set-lbl">総単語数</span><span class="set-val" id="s-tot"></span></div>
   <div class="set-row"><span class="set-lbl">覚えた単語</span><span class="set-val" id="s-lnd"></span></div>
   <div class="set-row"><span class="set-lbl">連続学習日数</span><span class="set-val" id="s-str"></span></div>
@@ -3657,18 +3660,37 @@ const shuf=a=>{const b=[...a];for(let i=b.length-1;i>0;i--){const j=0|Math.rando
 function speak(t){if(!window.speechSynthesis)return;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='th-TH';u.rate=.85;const v=speechSynthesis.getVoices().find(x=>x.lang==='th-TH'||x.lang==='th');if(v)u.voice=v;speechSynthesis.speak(u);}
 const lvL=lv=>LVN[lv]||lv;
 const getSt=id=>(wSt[id]&&wSt[id].status)||'苦手';
+// ── 判定アルゴリズム（設定画面で変更可能）──
+// pref.masterN : 「覚えた」と判定する連続正解回数（1〜5・既定2）
+// pref.wrongMode: 'reset'=不正解で苦手に戻す（厳しい） / 'down'=1段階だけ下げる（緩い）
+const masterT=()=>Math.min(5,Math.max(1,pref.masterN||2));
+// 連続正解数nから状態ラベルを導出
+function stFromN(n,T){
+  if(n>=T)return STL[3];          // 覚えた
+  if(n<=0)return STL[0];          // 苦手
+  if(T>=3&&n>=T-1)return STL[2];  // ほぼ覚えた（あと1回で習得）
+  return STL[1];                  // うろ覚え
+}
+// 旧データ（nなし）の連続正解数を状態から推定
+function inferN(status,T){
+  if(status===STL[3])return T;
+  if(status===STL[2])return Math.max(1,T-1);
+  if(status===STL[1])return 1;
+  return 0;
+}
 function updSt(w,ok){
-  const before=getSt(w.id);const i=STL.indexOf(before);
-  let after;
-  if(ok){
-    // 2回正解で覚えた: 苦手→うろ覚え→覚えた
-    if(i<=0) after=STL[1];      // 苦手→うろ覚え
-    else     after=STL[3];      // うろ覚え以上→覚えた
-  } else {
-    after=STL[0];               // 不正解→苦手に戻る
-  }
-  wSt[w.id]={status:after};recWord(w.id);save();
-  if(after==='覚えた'&&before!=='覚えた')showLevelUpToast();
+  const T=masterT();const cur=wSt[w.id]||{};const before=cur.status||STL[0];
+  let n=cur.n;if(n==null)n=inferN(before,T);
+  if(ok)n=n+1;
+  else n=((pref.wrongMode||'reset')==='down')?Math.max(0,n-1):0;
+  const after=stFromN(n,T);
+  wSt[w.id]={status:after,n:n};recWord(w.id);save();
+  if(after===STL[3]&&before!==STL[3])showLevelUpToast();
+}
+// 閾値変更時に全単語の状態を再計算
+function recomputeAllSt(){
+  const T=masterT();
+  for(const id in wSt){let n=wSt[id].n;if(n==null)n=inferN(wSt[id].status,T);wSt[id]={status:stFromN(n,T),n:n};}
 }
 let _toastTimer=null;
 function showLevelUpToast(){
@@ -4077,12 +4099,22 @@ function renderHome(){
 }
 
 // ── 設定 ────────────────────────────────────────────────
-function savePrefs(){pref.goal=parseInt(document.getElementById('s-goal').value);pref.timer=parseInt(document.getElementById('s-tmr').value);save();renderHome();}
+function savePrefs(){
+  const pn=parseInt(document.getElementById('s-mastern').value)||2;
+  const changed=pn!==(pref.masterN||2);
+  pref.goal=parseInt(document.getElementById('s-goal').value);
+  pref.timer=parseInt(document.getElementById('s-tmr').value);
+  pref.masterN=pn;
+  pref.wrongMode=document.getElementById('s-wrong').value;
+  if(changed)recomputeAllSt();
+  save();renderHome();renderSettings();
+}
 function renderSettings(){
   document.getElementById('s-tot').textContent=RAW.length+'件';document.getElementById('s-lnd').textContent=totLnd()+'件';
   document.getElementById('s-str').textContent=strk.cur+'日';document.getElementById('s-time').textContent=fmtT(slog.sec||0);
   document.getElementById('s-words').textContent=(slog.words||0).toLocaleString()+'語';document.getElementById('s-bm').textContent=(pref.bm||[]).length+'件';
   document.getElementById('s-goal').value=String(pref.goal||20);document.getElementById('s-tmr').value=String(pref.timer||0);
+  document.getElementById('s-mastern').value=String(pref.masterN||2);document.getElementById('s-wrong').value=pref.wrongMode||'reset';
 }
 function resetAll(){if(!confirm('進捗をリセットしますか？'))return;wSt={};badWs=[];okWs=[];strk={dates:[],best:0,cur:0};slog={sec:0,words:0,todayIds:[],todayDate:new Date().toISOString().slice(0,10),wkData:{}};_t0=Date.now();save();renderSettings();renderHome();}
 
