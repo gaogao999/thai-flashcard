@@ -3319,6 +3319,23 @@ svg{display:block}
 .arrange-result.ok{background:var(--good-bg);color:var(--good)}
 .arrange-result.ng{background:var(--bad-bg);color:var(--bad)}
 .arrange-correct{font-size:22px;font-weight:500;color:var(--ink);margin-top:8px;line-height:1.5}
+/* 辞書 */
+.dict-search-wrap{position:sticky;top:0;z-index:5;background:var(--bg);padding:12px 16px 10px}
+.dict-search{display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid var(--bg2);border-radius:12px;padding:11px 13px}
+.dict-search svg{color:var(--ink4);flex:none}
+.dict-search input{flex:1;border:none;outline:none;font-size:15px;background:none;color:var(--ink);min-width:0}
+.dict-clear{border:none;background:none;color:var(--ink4);font-size:18px;cursor:pointer;padding:0 2px;display:none}
+.dict-cnt{font-size:11px;color:var(--ink4);padding:2px 18px 4px}
+.dict-list{padding:6px 16px 16px;display:flex;flex-direction:column;gap:10px}
+.dict-card{background:#fff;border:1px solid var(--bg2);border-radius:14px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.dict-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.dict-thai{font-size:24px;font-weight:700;color:var(--ink);line-height:1.3}
+.dict-read{font-size:13px;color:var(--ink3);margin-top:3px}
+.dict-mean{font-size:15px;color:var(--ink);font-weight:600;margin-top:7px}
+.dict-badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}
+.dict-ex{margin-top:11px;padding-top:11px;border-top:1px dashed var(--bg2);font-size:12px;color:var(--ink3);line-height:1.7}
+.dict-ex-thai{color:var(--accent-dark);font-weight:600;font-size:13px}
+.dict-empty{text-align:center;color:var(--ink4);padding:48px 24px;font-size:14px;line-height:1.7}
 </style>
 </head>
 <body>
@@ -3562,11 +3579,25 @@ svg{display:block}
   </div>
 </div>
 
+<!-- 辞書 -->
+<div id="scr-dict" style="display:none;flex-direction:column;width:100%;flex:1;padding-bottom:80px">
+  <div class="dict-search-wrap">
+    <div class="dict-search">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+      <input type="search" id="dict-q" placeholder="タイ語・日本語・カナで検索" oninput="dictSearch()" autocomplete="off" autocapitalize="off">
+      <button class="dict-clear" id="dict-clear" onclick="dictClear()" aria-label="クリア">×</button>
+    </div>
+  </div>
+  <div class="dict-cnt" id="dict-cnt"></div>
+  <div class="dict-list" id="dict-list"></div>
+</div>
+
 <!-- ナビ -->
 <div class="bnav" id="bnav">
   <div class="bnav-inner">
     <button class="nav-btn active" id="nav-home" onclick="switchTab('home')"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5"></path><path d="M6 9.5V20h12V9.5"></path></svg></span>ホーム</button>
     <button class="nav-btn" id="nav-study" onclick="openCfgForStudy()"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.5C10.5 5.2 8.5 4.8 6 5v13c2.5-.2 4.5.2 6 1.5"></path><path d="M12 6.5C13.5 5.2 15.5 4.8 18 5v13c-2.5-.2-4.5.2-6 1.5z"></path></svg></span>学習</button>
+    <button class="nav-btn" id="nav-dict" onclick="switchTab('dict')"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg></span>辞書</button>
     <button class="nav-btn" id="nav-dash" onclick="switchTab('dash')"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20V11"></path><path d="M12 20V5"></path><path d="M19 20v-6"></path></svg></span>進捗</button>
     <button class="nav-btn" id="nav-settings" onclick="switchTab('settings')"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 7h9"></path><path d="M17 7h3"></path><circle cx="15" cy="7" r="2"></circle><path d="M4 17h3"></path><path d="M11 17h9"></path><circle cx="9" cy="17" r="2"></circle></svg></span>設定</button>
   </div>
@@ -3740,20 +3771,20 @@ function obSkip(){pref.onboarded=true;save();document.getElementById('ob-ov').st
 
 // ── 画面管理 ───────────────────────────────────────────
 let curTab='home',curLv=null,fromCh=false;
-const ALL_SCRS=['home','ch','flip','quiz','type','ex','result','dash','settings'];
+const ALL_SCRS=['home','ch','flip','quiz','type','ex','result','dict','dash','settings'];
 function showScr(id){ALL_SCRS.forEach(s=>{const el=document.getElementById('scr-'+s);if(el)el.style.display='none';});const el=document.getElementById('scr-'+id);if(el)el.style.display='flex';}
 const STUDY_SCRS=['flip','quiz','type','ex','result'];
 
 function switchTab(t){
   saveSec();curTab=t;
-  ['home','study','dash','settings'].forEach(x=>document.getElementById('nav-'+x)?.classList.toggle('active',x===t));
+  ['home','study','dict','dash','settings'].forEach(x=>document.getElementById('nav-'+x)?.classList.toggle('active',x===t));
   showScr(t);
-  const TT={home:'タイ語単語帳',dash:'進捗',settings:'設定'};
+  const TT={home:'タイ語単語帳',dict:'辞書',dash:'進捗',settings:'設定'};
   document.getElementById('pg-title').textContent=TT[t]||'';
   document.getElementById('hdr-back').style.display='none';
   document.getElementById('hdr-cfg').style.display='none';
   document.getElementById('bnav').style.display='flex';
-  if(t==='home')renderHome();if(t==='dash')renderDash();if(t==='settings')renderSettings();
+  if(t==='home')renderHome();if(t==='dict')renderDict();if(t==='dash')renderDash();if(t==='settings')renderSettings();
 }
 function headerBack(){
   if(fromCh){goChapters(curLv);fromCh=false;return;}
@@ -3764,7 +3795,7 @@ function closeCfgOrBack(){headerBack();}
 function goStudyAll(){cfg.lv='all';openCfgForStudy();}
 function openCfgForStudy(){
   // 「学習」タブからは設定モーダルを開く
-  ['home','study','dash','settings'].forEach(x=>document.getElementById('nav-'+x)?.classList.remove('active'));
+  ['home','study','dict','dash','settings'].forEach(x=>document.getElementById('nav-'+x)?.classList.remove('active'));
   document.getElementById('nav-study').classList.add('active');
   openCfg();
 }
@@ -3780,7 +3811,7 @@ function lastStudiedIdx(lv){
 }
 function goChapters(lv){
   curLv=lv;showScr('ch');
-  ['home','study','dash','settings'].forEach(t=>document.getElementById('nav-'+t).classList.remove('active'));
+  ['home','study','dict','dash','settings'].forEach(t=>document.getElementById('nav-'+t).classList.remove('active'));
   document.getElementById('pg-title').textContent=lvL(lv)+' ('+KT[lv]+')';
   document.getElementById('hdr-back').style.display='flex';
   document.getElementById('hdr-cfg').style.display='none';
@@ -4069,6 +4100,59 @@ function importMD(e){
   r.readAsText(file,'UTF-8');
   e.target.value='';
 }
+
+// ── 辞書（検索）────────────────────────────────────────
+// ひらがな→カタカナ（カナ検索でひらがな入力も拾う）
+const toKata=s=>(s||'').replace(/[ぁ-ゖ]/g,c=>String.fromCharCode(c.charCodeAt(0)+0x60));
+const DICT_MAX=300;
+function renderDict(){dictSearch();}
+function dictClear(){const i=document.getElementById('dict-q');i.value='';dictSearch();i.focus();}
+function dictSearch(){
+  const q=document.getElementById('dict-q').value.trim();
+  document.getElementById('dict-clear').style.display=q?'block':'none';
+  let res;
+  if(!q){res=RAW;}
+  else{
+    const lc=q.toLowerCase(),qk=toKata(q);
+    res=RAW.filter(w=>
+      (w.thai||'').includes(q)||
+      (w.meaning||'').includes(q)||
+      toKata(w.kana||'').includes(qk)||
+      (w.roman||'').toLowerCase().includes(lc)
+    );
+  }
+  renderDictList(res,q);
+}
+function renderDictList(res,q){
+  const cnt=document.getElementById('dict-cnt'),list=document.getElementById('dict-list');
+  if(!res.length){
+    cnt.textContent='';
+    list.innerHTML='<div class="dict-empty">'+(q?'「'+esc(q)+'」に一致する単語はありません':'単語がありません')+'</div>';
+    return;
+  }
+  cnt.textContent=res.length+'件'+(res.length>DICT_MAX?'（先頭'+DICT_MAX+'件を表示）':'');
+  const shown=res.slice(0,DICT_MAX);
+  list.innerHTML=shown.map(w=>{
+    const st=getSt(w.id);
+    const spk='<button class="spk" onclick="speak(\''+(w.thai||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L13 19V5L7.5 9.5z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg></button>';
+    let ex='';
+    if(w.ex1_thai){
+      ex='<div class="dict-ex"><div class="dict-ex-thai">'+esc(w.ex1_thai)+'</div>'
+        +(w.ex1_kana?'<div>'+esc(w.ex1_kana)+'</div>':'')
+        +(w.ex1_meaning?'<div>'+esc(w.ex1_meaning)+'</div>':'')+'</div>';
+    }
+    return '<div class="dict-card">'
+      +'<div class="dict-head"><div class="dict-thai">'+esc(w.thai)+'</div>'+spk+'</div>'
+      +'<div class="dict-read">'+esc(w.kana||'')+(w.roman?' ・ '+esc(w.roman):'')+'</div>'
+      +'<div class="dict-mean">'+esc(w.meaning||'')+'</div>'
+      +'<div class="dict-badges">'
+        +'<span class="lvbadge '+w.level+'">'+lvL(w.level)+'</span>'
+        +'<span class="pos-badge">'+esc(w.pos||'')+'</span>'
+        +'<span class="stbadge st-'+st+'">'+st+'</span>'
+      +'</div>'+ex+'</div>';
+  }).join('');
+}
+function esc(s){return (''+(s==null?'':s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
 // ── ホーム ──────────────────────────────────────────────
 function renderHome(){
@@ -4472,7 +4556,7 @@ function showResult(){
   document.getElementById('hdr-back').style.display='flex';
   document.getElementById('hdr-cfg').style.display='none';
   document.getElementById('bnav').style.display='flex';
-  ['home','study','dash','settings'].forEach(t=>document.getElementById('nav-'+t).classList.remove('active'));
+  ['home','study','dict','dash','settings'].forEach(t=>document.getElementById('nav-'+t).classList.remove('active'));
 }
 
 // ── 進捗 ─────────────────────────────────────────────────
