@@ -4074,8 +4074,10 @@ function fixExample(thai,kana,roman,meaning,words){
   if(!rm&&hasRoman(mn)){const sp=splitRomanJp(mn);if(sp){rm=sp.roman;mn=sp.jp;}}// ローマ字が意味欄に混入→分割
   mn=mn.replace(/^[\s!！"'“”|]+|[\s"'“”|]+$/g,'').trim();
   rm=rm.replace(/^[\s!！"'“”|]+|[\s!！"'“”|]+$/g,'').trim();
-  // 整形後も記号のみ/ローマ字残留/タイ文字混入なら破損とみなし破棄
-  if(!mn||/^[\s|"'`、，,.\-!！]+$/.test(mn)||hasRoman(mn)||/[฀-๿]/.test(mn))return null;
+  // 破損・断片の例文を破棄:
+  // 記号のみ / ローマ字残留 / タイ文字混入 / 意味が数字のみ / 意味が1文字 / romanに「文字+数字」連結
+  if(!mn||/^[\s|"'`、，,.\-!！]+$/.test(mn)||hasRoman(mn)||/[฀-๿]/.test(mn)
+     ||/^[0-9０-９\s]+$/.test(mn)||[...mn].length<=1||/[a-zà-ɿA-Z][0-9]/.test(rm))return null;
   const o={ex_thai:thai,ex_meaning:mn};
   if(kana)o.ex_kana=kana;if(rm)o.ex_roman=rm;if(words)o.ex_words=words;
   return o;
