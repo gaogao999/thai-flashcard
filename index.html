@@ -3507,6 +3507,7 @@ svg{display:block}
 <div id="scr-settings" style="display:none;flex-direction:column;width:100%;flex:1;padding-bottom:80px">
   <div class="set-row"><span class="set-lbl">1日の目標</span><select class="set-sel" id="s-goal" onchange="savePrefs()"><option value="10">10語</option><option value="20">20語</option><option value="50">50語</option><option value="100">100語</option></select></div>
   <div class="set-row"><span class="set-lbl">制限時間</span><select class="set-sel" id="s-tmr" onchange="savePrefs()"><option value="0">なし</option><option value="5">5秒</option><option value="10">10秒</option><option value="15">15秒</option><option value="30">30秒</option></select></div>
+  <div class="set-row"><span class="set-lbl">カタカナ読み</span><select class="set-sel" id="s-kana" onchange="savePrefs()"><option value="1">表示する</option><option value="0">表示しない</option></select></div>
   <div class="set-row"><span class="set-lbl">「覚えた」までの連続正解</span><select class="set-sel" id="s-mastern" onchange="savePrefs()"><option value="1">1回</option><option value="2">2回</option><option value="3">3回</option><option value="4">4回</option><option value="5">5回</option></select></div>
   <div class="set-row"><span class="set-lbl">間違えたとき</span><select class="set-sel" id="s-wrong" onchange="savePrefs()"><option value="reset">苦手に戻す（厳しい）</option><option value="down">1段階下げる（緩い）</option></select></div>
   <div style="font-size:11px;color:var(--ink4);padding:6px 14px 12px;line-height:1.6">連続で正解した回数が設定値に達すると「覚えた」と判定します。間違えると、設定に応じて苦手に戻すか1段階だけ下げます。回数を変更すると現在の判定も再計算されます。</div>
@@ -3742,6 +3743,7 @@ function speak(t){if(!window.speechSynthesis)return;speechSynthesis.cancel();con
 // 発音ボタン（onclick内のタイ語をJS文字列として安全にエスケープ）
 function spkBtn(thai,mt){return '<button class="spk" onclick="speak(\''+(thai||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\')"'+(mt?' style="margin-top:12px"':'')+'><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L13 19V5L7.5 9.5z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg></button>';}
 const lvL=lv=>LVN[lv]||lv;
+const showKana=()=>pref.showKana!==false;// カタカナ読みを表示するか（既定:表示）
 const getSt=id=>(wSt[id]&&wSt[id].status)||'苦手';
 // ── 判定アルゴリズム（設定画面で変更可能）──
 // pref.masterN : 「覚えた」と判定する連続正解回数（1〜5・既定2）
@@ -4295,6 +4297,7 @@ function savePrefs(){
   pref.timer=parseInt(document.getElementById('s-tmr').value);
   pref.masterN=pn;
   pref.wrongMode=document.getElementById('s-wrong').value;
+  pref.showKana=document.getElementById('s-kana').value==='1';
   if(changed)recomputeAllSt();
   save();renderHome();renderSettings();
 }
@@ -4304,6 +4307,7 @@ function renderSettings(){
   document.getElementById('s-words').textContent=(slog.words||0).toLocaleString()+'語';document.getElementById('s-bm').textContent=(pref.bm||[]).length+'件';
   document.getElementById('s-goal').value=String(pref.goal||20);document.getElementById('s-tmr').value=String(pref.timer||0);
   document.getElementById('s-mastern').value=String(pref.masterN||2);document.getElementById('s-wrong').value=pref.wrongMode||'reset';
+  document.getElementById('s-kana').value=pref.showKana===false?'0':'1';
 }
 function resetAll(){if(!confirm('進捗をリセットしますか？'))return;wSt={};badWs=[];okWs=[];strk={dates:[],best:0,cur:0};slog={sec:0,words:0,todayIds:[],todayDate:new Date().toISOString().slice(0,10),wkData:{}};_t0=Date.now();save();renderSettings();renderHome();}
 
@@ -4366,7 +4370,7 @@ function showCard(){
       +'<span class="lvbadge '+w.level+'">'+lvL(w.level)+'</span>'
       +'<span class="stbadge st-'+st+'">'+st+'</span>'
       +'<div class="word-main">'+T+'</div>'
-      +'<div class="word-sub">'+K+'</div>'
+      +(showKana()?'<div class="word-sub">'+K+'</div>':'')
       +'<div class="word-roman">'+Rm+'</div>'
       +SP
       +'<div class="word-hint">タップして意味を見る</div>';
@@ -4385,7 +4389,7 @@ function showCard(){
       +'<div class="word-hint">タップしてタイ語を見る</div>';
     document.getElementById('ff-back').innerHTML=bmBtn
       +'<div class="word-main">'+T+'</div>'
-      +'<div class="word-sub">'+K+'</div>'
+      +(showKana()?'<div class="word-sub">'+K+'</div>':'')
       +'<div class="word-roman">'+Rm+'</div>'
       +SP;
   }
@@ -4465,7 +4469,7 @@ function showQz(){
   const bmBtn='';
   if(aT){
     document.getElementById('qz-q').innerHTML='<span class="lvbadge '+w.level+'">'+lvL(w.level)+'</span><span class="stbadge st-'+st+'">'+st+'</span>'
-      +'<div class="word-main">'+esc(w.thai)+'</div><div class="word-sub">'+esc(w.kana)+'</div>'
+      +'<div class="word-main">'+esc(w.thai)+'</div>'+(showKana()?'<div class="word-sub">'+esc(w.kana)+'</div>':'')
       +spkBtn(w.thai,true)+bmBtn;
     setTimeout(()=>speak(w.thai),300);
   }else{
@@ -4497,7 +4501,7 @@ function showType(){
   const aT=cfg.dir==='thai';const st=getSt(w.id);
   if(aT){
     document.getElementById('tp-q').innerHTML='<span class="lvbadge '+w.level+'">'+lvL(w.level)+'</span><span class="stbadge st-'+st+'">'+st+'</span>'
-      +'<div class="word-main">'+esc(w.thai)+'</div><div class="word-sub">'+esc(w.kana)+'</div>'
+      +'<div class="word-main">'+esc(w.thai)+'</div>'+(showKana()?'<div class="word-sub">'+esc(w.kana)+'</div>':'')
       +spkBtn(w.thai,true)
       +'<div style="font-size:12px;color:var(--ink3);margin-top:12px">日本語で意味を入力</div>';
     setTimeout(()=>speak(w.thai),300);
