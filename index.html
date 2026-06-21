@@ -4727,8 +4727,20 @@ if(navigator.storage&&navigator.storage.persist){
 
 // ── PWA: Service Worker登録 ──
 if('serviceWorker' in navigator){
+  // 新バージョン検知時に一度だけ自動リロード（更新を確実に反映）
+  let _refreshing=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(_refreshing)return;_refreshing=true;location.reload();});
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('sw.js').catch(()=>{});
+    navigator.serviceWorker.register('sw.js').then(reg=>{
+      reg.update&&reg.update();// 起動時に更新チェック
+      if(reg.waiting)reg.waiting.postMessage('skipWaiting');// 待機中の新SWを即時有効化
+      reg.addEventListener&&reg.addEventListener('updatefound',()=>{
+        const nw=reg.installing;if(!nw)return;
+        nw.addEventListener('statechange',()=>{if(nw.state==='installed'&&navigator.serviceWorker.controller)nw.postMessage&&nw.postMessage('skipWaiting');});
+      });
+    }).catch(()=>{});
+    // 復帰時にも更新チェック（iOS PWAの再開対策）
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)navigator.serviceWorker.getRegistration().then(r=>r&&r.update&&r.update()).catch(()=>{});});
   });
 }
 </script>
