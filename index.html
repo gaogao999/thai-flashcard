@@ -3336,6 +3336,9 @@ svg{display:block}
 .dict-ex{margin-top:11px;padding-top:11px;border-top:1px dashed var(--bg2);font-size:12px;color:var(--ink3);line-height:1.7}
 .dict-ex-thai{color:var(--accent-dark);font-weight:600;font-size:13px}
 .dict-empty{text-align:center;color:var(--ink4);padding:48px 24px;font-size:14px;line-height:1.7}
+.dict-acts{display:flex;gap:6px;flex:none}
+.dict-iconbtn{padding:7px;border:1.5px solid var(--accent-light);border-radius:50%;background:transparent;cursor:pointer;color:var(--accent);display:inline-flex;align-items:center;justify-content:center;flex:none}
+.dict-iconbtn.on{color:var(--warn);border-color:var(--warn)}
 </style>
 </head>
 <body>
@@ -3724,6 +3727,8 @@ function pickDistractors(w, pool3){
 
 const shuf=a=>{const b=[...a];for(let i=b.length-1;i>0;i--){const j=0|Math.random()*(i+1);[b[i],b[j]]=[b[j],b[i]];}return b;};
 function speak(t){if(!window.speechSynthesis)return;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='th-TH';u.rate=.85;const v=speechSynthesis.getVoices().find(x=>x.lang==='th-TH'||x.lang==='th');if(v)u.voice=v;speechSynthesis.speak(u);}
+// 発音ボタン（onclick内のタイ語をJS文字列として安全にエスケープ）
+function spkBtn(thai,mt){return '<button class="spk" onclick="speak(\''+(thai||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\')"'+(mt?' style="margin-top:12px"':'')+'><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L13 19V5L7.5 9.5z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg></button>';}
 const lvL=lv=>LVN[lv]||lv;
 const getSt=id=>(wSt[id]&&wSt[id].status)||'苦手';
 // ── 判定アルゴリズム（設定画面で変更可能）──
@@ -4128,10 +4133,16 @@ function exportMD(){
     md+='> ⚠️ このファイルがあれば、履歴やサイトデータを消してもここから復元できます。大切に保管してください。\n\n';
     md+='## 学習データ（復元用・この部分は編集しないでください）\n\n';
     md+='```json\n'+JSON.stringify(data)+'\n```\n\n';
+    // 単語一覧（読みやすさ用）。大量データではファイル肥大化を避けるため省略
+    const TBL_MAX=500;
     md+='## 単語一覧（読みやすさ用）\n\n';
-    md+='| ID | タイ語 | カナ | 発音 | 意味 | 品詞 | レベル | スコア |\n';
-    md+='|---|---|---|---|---|---|---|---|\n';
-    RAW.forEach(w=>{md+='| '+esc(w.id)+' | '+esc(w.thai)+' | '+esc(w.kana)+' | '+esc(w.roman)+' | '+esc(w.meaning)+' | '+esc(w.pos)+' | '+esc(w.level)+' | '+esc(w.score)+' |\n';});
+    if(RAW.length>TBL_MAX){
+      md+='単語数が多いため表は省略しています（全'+RAW.length+'件は上の復元用データに含まれます）。\n';
+    }else{
+      md+='| ID | タイ語 | カナ | 発音 | 意味 | 品詞 | レベル | スコア |\n';
+      md+='|---|---|---|---|---|---|---|---|\n';
+      RAW.forEach(w=>{md+='| '+esc(w.id)+' | '+esc(w.thai)+' | '+esc(w.kana)+' | '+esc(w.roman)+' | '+esc(w.meaning)+' | '+esc(w.pos)+' | '+esc(w.level)+' | '+esc(w.score)+' |\n';});
+    }
     const blob=new Blob([md],{type:'text/markdown;charset=utf-8'});
     const url=URL.createObjectURL(blob);const a=document.createElement('a');
     a.href=url;a.download=fn;document.body.appendChild(a);a.click();document.body.removeChild(a);
@@ -4198,7 +4209,8 @@ function renderDictList(res,q){
   const shown=res.slice(0,DICT_MAX);
   list.innerHTML=shown.map(w=>{
     const st=getSt(w.id);
-    const spk='<button class="spk" onclick="speak(\''+(w.thai||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L13 19V5L7.5 9.5z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg></button>';
+    const spk='<button class="dict-iconbtn" onclick="speak(\''+(w.thai||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L13 19V5L7.5 9.5z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg></button>';
+    const bm='<button class="dict-iconbtn'+(isBM(w.id)?' on':'')+'" data-id="'+esc(w.id)+'" onclick="dictBM(this)">'+bmSvg(isBM(w.id))+'</button>';
     let ex='';
     ['ex1','ex2','ex3'].forEach(p=>{
       const th=w[p+'_thai'];if(!th)return;
@@ -4209,7 +4221,7 @@ function renderDictList(res,q){
         +(mn?'<div>'+esc(mn)+'</div>':'')+'</div>';
     });
     return '<div class="dict-card">'
-      +'<div class="dict-head"><div class="dict-thai">'+esc(w.thai)+'</div>'+spk+'</div>'
+      +'<div class="dict-head"><div class="dict-thai">'+esc(w.thai)+'</div><div class="dict-acts">'+bm+spk+'</div></div>'
       +'<div class="dict-read">'+esc(w.kana||'')+(w.roman?' ・ '+esc(w.roman):'')+'</div>'
       +'<div class="dict-mean">'+esc(w.meaning||'')+'</div>'
       +'<div class="dict-badges">'
@@ -4220,6 +4232,12 @@ function renderDictList(res,q){
   }).join('');
 }
 function esc(s){return (''+(s==null?'':s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+// ブックマークの星アイコン（登録時は塗りつぶし）
+function bmSvg(on){return on
+  ?'<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M6 4h12v17l-6-4-6 4z"/></svg>'
+  :'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h12v17l-6-4-6 4z"/></svg>';}
+// 辞書カードのブックマーク切替（再描画せずボタンのみ更新）
+function dictBM(btn){const id=btn.dataset.id;if(isBM(id))pref.bm=pref.bm.filter(x=>x!==id);else pref.bm.push(id);save();const on=isBM(id);btn.classList.toggle('on',on);btn.innerHTML=bmSvg(on);}
 
 // ── ホーム ──────────────────────────────────────────────
 function renderHome(){
@@ -4321,34 +4339,35 @@ function showCard(){
 
   const st=getSt(w.id);const aT=cfg.dir==='thai';
   const bmBtn='';
+  const T=esc(w.thai),K=esc(w.kana),Rm=esc(w.roman),M=esc(w.meaning),P=esc(w.pos),SP=spkBtn(w.thai);
 
   if(aT){
     document.getElementById('ff-front').innerHTML=bmBtn
       +'<span class="lvbadge '+w.level+'">'+lvL(w.level)+'</span>'
       +'<span class="stbadge st-'+st+'">'+st+'</span>'
-      +'<div class="word-main">'+w.thai+'</div>'
-      +'<div class="word-sub">'+w.kana+'</div>'
-      +'<div class="word-roman">'+w.roman+'</div>'
-      +'<button class="spk" onclick="speak(\''+w.thai.replace(/'/g,"\\'")+'\')" ><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L13 19V5L7.5 9.5z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg></button>'
+      +'<div class="word-main">'+T+'</div>'
+      +'<div class="word-sub">'+K+'</div>'
+      +'<div class="word-roman">'+Rm+'</div>'
+      +SP
       +'<div class="word-hint">タップして意味を見る</div>';
     document.getElementById('ff-back').innerHTML=bmBtn
-      +'<span class="pos-badge">'+w.pos+'</span>'
-      +'<div class="word-meaning">'+w.meaning+'</div>'
-      +'<div class="word-main" style="font-size:40px;color:var(--ink3)">'+w.thai+'</div>'
-      +'<button class="spk" onclick="speak(\''+w.thai.replace(/'/g,"\\'")+'\')" ><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L13 19V5L7.5 9.5z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg></button>';
+      +'<span class="pos-badge">'+P+'</span>'
+      +'<div class="word-meaning">'+M+'</div>'
+      +'<div class="word-main" style="font-size:40px;color:var(--ink3)">'+T+'</div>'
+      +SP;
     setTimeout(()=>speak(w.thai),400);
   }else{
     document.getElementById('ff-front').innerHTML=bmBtn
       +'<span class="lvbadge '+w.level+'">'+lvL(w.level)+'</span>'
       +'<span class="stbadge st-'+st+'">'+st+'</span>'
-      +'<span class="pos-badge">'+w.pos+'</span>'
-      +'<div class="word-meaning">'+w.meaning+'</div>'
+      +'<span class="pos-badge">'+P+'</span>'
+      +'<div class="word-meaning">'+M+'</div>'
       +'<div class="word-hint">タップしてタイ語を見る</div>';
     document.getElementById('ff-back').innerHTML=bmBtn
-      +'<div class="word-main">'+w.thai+'</div>'
-      +'<div class="word-sub">'+w.kana+'</div>'
-      +'<div class="word-roman">'+w.roman+'</div>'
-      +'<button class="spk" onclick="speak(\''+w.thai.replace(/'/g,"\\'")+'\')" ><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L13 19V5L7.5 9.5z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg></button>';
+      +'<div class="word-main">'+T+'</div>'
+      +'<div class="word-sub">'+K+'</div>'
+      +'<div class="word-roman">'+Rm+'</div>'
+      +SP;
   }
   startTmr('flip-tmr',()=>{if(!flipped)flipCard();});
   setupSwipe();
@@ -4426,19 +4445,19 @@ function showQz(){
   const bmBtn='';
   if(aT){
     document.getElementById('qz-q').innerHTML='<span class="lvbadge '+w.level+'">'+lvL(w.level)+'</span><span class="stbadge st-'+st+'">'+st+'</span>'
-      +'<div class="word-main">'+w.thai+'</div><div class="word-sub">'+w.kana+'</div>'
-      +'<button class="spk" onclick="speak(\''+w.thai.replace(/'/g,"\\'")+'\')" style="margin-top:12px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L13 19V5L7.5 9.5z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg></button>'+bmBtn;
+      +'<div class="word-main">'+esc(w.thai)+'</div><div class="word-sub">'+esc(w.kana)+'</div>'
+      +spkBtn(w.thai,true)+bmBtn;
     setTimeout(()=>speak(w.thai),300);
   }else{
     document.getElementById('qz-q').innerHTML='<span class="lvbadge '+w.level+'">'+lvL(w.level)+'</span><span class="stbadge st-'+st+'">'+st+'</span>'
-      +'<div class="word-meaning">'+w.meaning+'</div><span class="pos-badge">'+w.pos+'</span>'+bmBtn;
+      +'<div class="word-meaning">'+esc(w.meaning)+'</div><span class="pos-badge">'+esc(w.pos)+'</span>'+bmBtn;
   }
   const pool=RAW.filter(x=>x.id!==w.id&&x.pos===w.pos);
   const opts=shuf([w,...pickDistractors(w, pool)]);
   const od=document.getElementById('qz-opts');od.innerHTML='';
   opts.forEach((o,ni)=>{
     const btn=document.createElement('button');btn.className='quiz-opt';
-    btn.innerHTML='<div class="quiz-opt-num">'+QZ_NUMS[ni]+'</div><span>'+(aT?o.meaning:o.thai)+'</span>';
+    btn.innerHTML='<div class="quiz-opt-num">'+QZ_NUMS[ni]+'</div><span>'+esc(aT?o.meaning:o.thai)+'</span>';
     btn.onclick=()=>{if(qAns)return;qAns=true;Array.from(od.children).forEach(b=>b.style.pointerEvents='none');
       const ok=o.id===w.id;const ct=aT?w.meaning:w.thai;
       if(ok){btn.style.background='var(--good-bg)';btn.querySelector('.quiz-opt-num').style.background='var(--good)';btn.querySelector('.quiz-opt-num').style.color='#fff';}
@@ -4458,13 +4477,13 @@ function showType(){
   const aT=cfg.dir==='thai';const st=getSt(w.id);
   if(aT){
     document.getElementById('tp-q').innerHTML='<span class="lvbadge '+w.level+'">'+lvL(w.level)+'</span><span class="stbadge st-'+st+'">'+st+'</span>'
-      +'<div class="word-main">'+w.thai+'</div><div class="word-sub">'+w.kana+'</div>'
-      +'<button class="spk" onclick="speak(\''+w.thai.replace(/'/g,"\\'")+'\')" style="margin-top:12px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L13 19V5L7.5 9.5z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg></button>'
+      +'<div class="word-main">'+esc(w.thai)+'</div><div class="word-sub">'+esc(w.kana)+'</div>'
+      +spkBtn(w.thai,true)
       +'<div style="font-size:12px;color:var(--ink3);margin-top:12px">日本語で意味を入力</div>';
     setTimeout(()=>speak(w.thai),300);
   }else{
     document.getElementById('tp-q').innerHTML='<span class="lvbadge '+w.level+'">'+lvL(w.level)+'</span><span class="stbadge st-'+st+'">'+st+'</span>'
-      +'<div class="word-meaning">'+w.meaning+'</div>'
+      +'<div class="word-meaning">'+esc(w.meaning)+'</div>'
       +'<div style="font-size:12px;color:var(--ink3);margin-top:10px">タイ語をローマ字で入力</div>';
   }
   const inp=document.getElementById('tp-inp');inp.value='';inp.className='type-inp';
