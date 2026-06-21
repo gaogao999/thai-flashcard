@@ -3650,14 +3650,25 @@ let cfg={mode:'flip',dir:'thai',order:'random',limit:50,lv:'all',pos:'all'};// �
 let _t0=Date.now();
 
 function save(){if(idbOK)idbSet('tap_raw',RAW).catch(()=>{});else ss('tap_raw',RAW);ss('tap_st',wSt);ss('tap_streak',strk);ss('tap_slog',slog);ss('tap_pref',pref);}
-// 起動時にRAWを読み込む（IDB→旧localStorageから移行→デフォルト）
+// 同梱の辞書(words.json 約1.8万語)を読み込む。失敗時は内蔵デフォルトにフォールバック
+async function loadSeed(){
+  try{const res=await fetch('words.json',{cache:'force-cache'});if(res.ok){const arr=await res.json();if(Array.isArray(arr)&&arr.length)return arr;}}catch{}
+  return DEFAULT_RAW;
+}
+// 保存済みデータが未カスタマイズの内蔵デフォルト(49語)かどうか
+const isStockDefault=a=>Array.isArray(a)&&a.length===DEFAULT_RAW.length&&a[0]&&a[0].id===DEFAULT_RAW[0].id;
+// 起動時にRAWを読み込む（IDB→旧localStorageから移行→同梱辞書）
 async function bootRAW(){
   try{
     const v=await idbGet('tap_raw');
-    if(Array.isArray(v)&&v.length){RAW=v;return;}
+    if(Array.isArray(v)&&v.length){
+      // 旧バージョンの初期49語のみの利用者は同梱辞書へ自動アップグレード（独自インポートは保持）
+      if(isStockDefault(v)){const seed=await loadSeed();if(seed.length>v.length){RAW=seed;await idbSet('tap_raw',RAW);return;}}
+      RAW=v;return;
+    }
     const legacy=localStorage.getItem('tap_raw');// 旧版からの移行
-    if(legacy){try{const arr=JSON.parse(legacy);if(Array.isArray(arr)&&arr.length){RAW=arr;await idbSet('tap_raw',RAW);try{localStorage.removeItem('tap_raw');}catch{}return;}}catch{}}
-    RAW=DEFAULT_RAW;await idbSet('tap_raw',RAW);// 初回
+    if(legacy){try{const arr=JSON.parse(legacy);if(Array.isArray(arr)&&arr.length){RAW=isStockDefault(arr)?await loadSeed():arr;await idbSet('tap_raw',RAW);try{localStorage.removeItem('tap_raw');}catch{}return;}}catch{}}
+    RAW=await loadSeed();await idbSet('tap_raw',RAW);// 初回は同梱辞書を取り込む
   }catch(e){idbOK=false;RAW=ls('tap_raw',DEFAULT_RAW);}// IDB非対応時はlocalStorageにフォールバック
 }
 function recStrk(){
@@ -4038,6 +4049,32 @@ function applyCfg(){
 }
 
 // ── CSV ────────────────────────────────────────────────
+// ローマ字読みの痕跡（タイ語ローマ字に頻出するIPA記号）
+const hasRoman=s=>/[ɛŋʉɔɯ]/.test(s||'');
+// 日本語(かな/漢字/全角記号)の先頭位置でローマ字と意味を分割（スクレイピング崩れの復元用）
+function splitRomanJp(s){
+  const t=(s||'').trim();
+  const m=t.match(/[　-ヿ㐀-鿿！-｠￠-￦]/);
+  if(!m)return null;
+  let idx=m.index;
+  while(idx>0&&/[\[\(（「『"'“”\s!！]/.test(t[idx-1]))idx--;// 日本語注記の前の括弧等を意味側へ戻す
+  const roman=t.slice(0,idx).replace(/^[\s!！"'“”|]+|[\s!！"'“”|]+$/g,'').trim();
+  const jp=t.slice(idx).replace(/^[\s"'“”|]+|[\s"'“”|]+$/g,'').trim();
+  return {roman,jp};
+}
+// 例文1件を整形・復元。復元不能な断片はnullを返す
+function fixExample(thai,kana,roman,meaning,words){
+  if(!thai)return null;
+  let mn=(meaning||'').trim(),rm=(roman||'').trim();
+  if(!rm&&hasRoman(mn)){const sp=splitRomanJp(mn);if(sp){rm=sp.roman;mn=sp.jp;}}// ローマ字が意味欄に混入→分割
+  mn=mn.replace(/^[\s!！"'“”|]+|[\s"'“”|]+$/g,'').trim();
+  rm=rm.replace(/^[\s!！"'“”|]+|[\s!！"'“”|]+$/g,'').trim();
+  // 整形後も記号のみ/ローマ字残留/タイ文字混入なら破損とみなし破棄
+  if(!mn||/^[\s|"'`、，,.\-!！]+$/.test(mn)||hasRoman(mn)||/[฀-๿]/.test(mn))return null;
+  const o={ex_thai:thai,ex_meaning:mn};
+  if(kana)o.ex_kana=kana;if(rm)o.ex_roman=rm;if(words)o.ex_words=words;
+  return o;
+}
 function parseCSV(txt){
   const rows=[];let row=[],f='',inQ=false;
   for(let i=0;i<txt.length;i++){const c=txt[i],n=txt[i+1];
@@ -4063,8 +4100,10 @@ function loadCSV(e){
       const nw=rows.slice(1).map(r=>{const sc=parseInt(r[im.score])||0;
         const o={id:r[im.id],thai:r[im.thai],kana:im.kana!=null?r[im.kana]:'',roman:im.roman!=null?r[im.roman]:'',
           meaning:norm(r[im.meaning]),pos:r[im.pos]||'その他',level:gc(sc),score:sc};
-        // 例文 ex1/ex2/ex3 を取り込む（存在する項目のみ）
-        ['ex1','ex2','ex3'].forEach(p=>{['_thai','_kana','_roman','_meaning','_thai_words'].forEach(s=>{const v=gx(r,p+s);if(v)o[p+s]=v;});});
+        // 例文 ex1/ex2/ex3 を整形・復元し、有効なものだけを詰め直す
+        const exs=[];
+        ['ex1','ex2','ex3'].forEach(p=>{const fx=fixExample(gx(r,p+'_thai'),gx(r,p+'_kana'),gx(r,p+'_roman'),gx(r,p+'_meaning'),gx(r,p+'_thai_words'));if(fx)exs.push(fx);});
+        exs.forEach((ex,i)=>{const p='ex'+(i+1);o[p+'_thai']=ex.ex_thai;o[p+'_meaning']=ex.ex_meaning;if(ex.ex_kana)o[p+'_kana']=ex.ex_kana;if(ex.ex_roman)o[p+'_roman']=ex.ex_roman;if(ex.ex_words)o[p+'_thai_words']=ex.ex_words;});
         return o;
       }).filter(w=>w.thai&&w.meaning);
       if(!nw.length){csvSt('単語なし',false);return;}
