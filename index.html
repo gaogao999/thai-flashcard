@@ -3654,7 +3654,7 @@ let _t0=Date.now();
 
 function save(){if(idbOK)idbSet('tap_raw',RAW).catch(()=>{});else ss('tap_raw',RAW);ss('tap_st',wSt);ss('tap_streak',strk);ss('tap_slog',slog);ss('tap_pref',pref);}
 // 同梱辞書の版。words.json更新時にこの数字を上げると既存利用者も最新版に更新される
-const SEED_VER=2;
+const SEED_VER=3;
 // 同梱の辞書(words.json 約1.8万語)を読み込む。?vでSWの古いキャッシュを回避。失敗時はnull
 async function loadSeed(){
   try{const res=await fetch('words.json?v='+SEED_VER,{cache:'no-store'});if(res.ok){const arr=await res.json();if(Array.isArray(arr)&&arr.length)return arr;}}catch{}
@@ -4087,9 +4087,12 @@ function fixExample(thai,kana,roman,meaning,words){
   mn=mn.replace(/^[\s!！"'“”|]+|[\s"'“”|]+$/g,'').trim();
   rm=rm.replace(/^[\s!！"'“”|]+|[\s!！"'“”|]+$/g,'').trim();
   // 破損・断片の例文を破棄:
-  // 記号のみ / ローマ字残留 / タイ文字混入 / 意味が数字のみ / 意味が1文字 / romanに「文字+数字」連結
+  // 記号のみ / ローマ字残留 / タイ文字混入 / 数字のみ / 1文字 / roman「文字+数字」/
+  // roman に日本語混入 / 意味に改行・URL（サイト解説文の流入）
   if(!mn||/^[\s|"'`、，,.\-!！]+$/.test(mn)||hasRoman(mn)||/[฀-๿]/.test(mn)
-     ||/^[0-9０-９\s]+$/.test(mn)||[...mn].length<=1||/[a-zà-ɿA-Z][0-9]/.test(rm))return null;
+     ||/^[0-9０-９\s]+$/.test(mn)||[...mn].length<=1||/[a-zà-ɿA-Z][0-9]/.test(rm)
+     ||/[぀-ヿ㐀-鿿]/.test(rm)||/[\n\r]/.test(mn)||/https?:/i.test(mn))return null;
+  if(words)words=words.split('|').map(s=>s.trim()).filter(Boolean).join('|');// 空の分かち書きトークンを除去
   const o={ex_thai:thai,ex_meaning:mn};
   if(kana)o.ex_kana=kana;if(rm)o.ex_roman=rm;if(words)o.ex_words=words;
   return o;
