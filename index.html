@@ -3029,7 +3029,7 @@
   --blue:#5E7387;--blue-bg:#EAEDF2;--border:#E6DFD3;
   --radius:18px;--shadow:0 8px 28px rgba(34,24,16,.07);
 }
-body{font-family:'Zen Kaku Gothic New',-apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;display:flex;flex-direction:column;width:100%}
+body{font-family:'Zen Kaku Gothic New',-apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;width:100%;overscroll-behavior-y:none}
 svg{display:block}
 .wrap{width:100%;padding:0 16px 100px}
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
@@ -3158,7 +3158,7 @@ svg{display:block}
 .cfg-apply{margin:16px 20px 0;width:calc(100% - 40px);padding:16px;border:none;border-radius:14px;background:var(--accent);color:#fff;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(255,128,0,.25)}
 
 /* ─ 学習画面 ─ */
-.study-topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--bg2);background:#fff;width:100%}
+.study-topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--bg2);background:#fff;width:100%;position:sticky;top:0;z-index:30}
 .study-prog-text{font-size:13px;font-weight:600;color:var(--ink3);flex:1;text-align:center}
 .study-close{width:32px;height:32px;border-radius:50%;background:var(--bg);border:1px solid var(--bg2);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.07);color:var(--ink2)}
 .study-timer{height:3px;background:var(--accent);transition:width linear}
@@ -3829,6 +3829,7 @@ const STUDY_SCRS=['flip','quiz','type','ex','result'];
 
 function switchTab(t){
   saveSec();curTab=t;
+  document.getElementById('hdr').style.display='';// メインヘッダーを表示に戻す
   ['home','study','dict','dash','settings'].forEach(x=>document.getElementById('nav-'+x)?.classList.toggle('active',x===t));
   showScr(t);
   const TT={home:'タイ語単語帳',dict:'辞書',dash:'進捗',settings:'設定'};
@@ -3863,6 +3864,7 @@ function lastStudiedIdx(lv){
 }
 function goChapters(lv){
   curLv=lv;showScr('ch');
+  document.getElementById('hdr').style.display='';// メインヘッダーを表示に戻す
   ['home','study','dict','dash','settings'].forEach(t=>document.getElementById('nav-'+t).classList.remove('active'));
   document.getElementById('pg-title').textContent=lvL(lv)+' ('+KT[lv]+')';
   document.getElementById('hdr-back').style.display='flex';
@@ -3981,6 +3983,7 @@ function _start(wl,label,isCh){
   words=wl;idx=0;stats={bad:0,ok:0,good:0};qSt={c:0,w:0};tpSt={c:0,w:0};
   badWs=[];okWs=[];qAns=false;
   document.getElementById('pg-title').textContent='';
+  document.getElementById('hdr').style.display='none'; // 学習中はメインヘッダー非表示（学習用バーを最上部に）
   document.getElementById('hdr-back').style.display=isCh?'flex':'none';
   document.getElementById('hdr-cfg').style.display='none';
   document.getElementById('bnav').style.display='none'; // 学習中はナビ非表示（mikan方式）
@@ -4654,6 +4657,7 @@ function showResult(){
   h+='</div>';
   document.getElementById('result-con').innerHTML=h;
   showScr('result');
+  document.getElementById('hdr').style.display='';// メインヘッダーを表示に戻す
   if(acc>=80)setTimeout(fireConfetti,200); // 高得点で紙吹雪
   document.getElementById('pg-title').textContent='結果';
   document.getElementById('hdr-back').style.display='flex';
