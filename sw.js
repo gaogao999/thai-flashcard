@@ -1,6 +1,6 @@
 // タイ語単語帳 Service Worker
 // バージョンを変えると自動更新される（更新時はこの数字を上げる）
-const CACHE_VERSION = 'thai-flashcard-v4';
+const CACHE_VERSION = 'thai-flashcard-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -10,6 +10,9 @@ const ASSETS = [
   './icon-512.png',
   './apple-touch-icon.png'
 ];
+
+// ページからの skipWaiting 要求に応答（更新の即時反映）
+self.addEventListener('message', (e) => { if (e.data === 'skipWaiting') self.skipWaiting(); });
 
 // インストール時：ファイルをキャッシュ
 self.addEventListener('install', (e) => {
