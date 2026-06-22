@@ -3549,6 +3549,12 @@ svg{display:block}
         <button class="cfg-seg-btn" onclick="setCfgSeg('dir','jp',this)">日→タイ</button>
       </div>
     </div>
+    <div class="cfg-row"><span class="cfg-label">出題範囲</span>
+      <div class="cfg-seg" id="seg-scope">
+        <button class="cfg-seg-btn on" onclick="setCfgSeg('scope','all',this)">すべて</button>
+        <button class="cfg-seg-btn" onclick="setCfgSeg('scope','weak',this)">苦手のみ</button>
+      </div>
+    </div>
     <div class="cfg-row"><span class="cfg-label">出題順</span>
       <div class="cfg-seg" id="seg-order">
         <button class="cfg-seg-btn on" onclick="setCfgSeg('order','random',this)">ランダム</button>
@@ -3642,7 +3648,7 @@ let wSt=ls('tap_st',{});
 let strk=ls('tap_streak',{dates:[],best:0,cur:0});
 let slog=ls('tap_slog',{sec:0,words:0,todayIds:[],todayDate:'',wkData:{}});
 let pref=ls('tap_pref',{goal:20,timer:0,onboarded:false,bm:[]});
-let cfg={mode:'flip',dir:'thai',order:'random',limit:50,lv:'all',pos:'all'};// 学習設定
+let cfg={mode:'flip',dir:'thai',order:'random',scope:'all',limit:50,lv:'all',pos:'all'};// 学習設定
 
 (()=>{
   const t=new Date().toISOString().slice(0,10);
@@ -4063,10 +4069,12 @@ function applyCfg(){
   document.getElementById('cfg-ov').classList.remove('open');
   document.body.style.overflow='';
   let f=RAW.filter(w=>(cfg.lv==='all'||w.level===cfg.lv)&&(cfg.pos==='all'||w.pos===cfg.pos));
+  if(cfg.scope==='weak')f=f.filter(w=>{const s=getSt(w.id);return s==='苦手'||s==='うろ覚え';});// 苦手のみに絞る
+  if(!f.length){alert(cfg.scope==='weak'?'この範囲に苦手な単語はありません':'該当する単語がありません');return;}
   if(cfg.order==='random')f=shuf(f);
   else if(cfg.order==='weak')f=f.slice().sort((a,b)=>STL.indexOf(getSt(a.id))-STL.indexOf(getSt(b.id)));
   else f=f.slice().sort((a,b)=>b.score-a.score);
-  const lbl=(cfg.lv==='all'?'全レベル':lvL(cfg.lv));
+  const lbl=(cfg.lv==='all'?'全レベル':lvL(cfg.lv))+(cfg.scope==='weak'?'・苦手':'');
   fromCh=false;_start(f.slice(0,cfg.limit),lbl,false);
 }
 
