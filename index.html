@@ -4212,6 +4212,28 @@ const toKata=s=>(s||'').replace(/[ぁ-ゖ]/g,c=>String.fromCharCode(c.charCodeAt
 const DICT_MAX=300;
 function renderDict(){dictSearch();}
 function dictClear(){const i=document.getElementById('dict-q');i.value='';dictSearch();i.focus();}
+// 検索の関連度スコア（完全一致＞前方一致＞部分一致、短い語ほど上位）
+function dictScore(w,q,lc,qk){
+  let s=0;
+  const th=w.thai||'';
+  if(th===q)s=Math.max(s,1000);
+  else if(th.startsWith(q))s=Math.max(s,900-Math.min(th.length,80));
+  else if(th.includes(q))s=Math.max(s,700-Math.min(th.length,80));
+  const mn=w.meaning||'';
+  if(mn===q)s=Math.max(s,820);
+  else if(mn.split('、').indexOf(q)>=0)s=Math.max(s,680);// 複数意味のうちの一つに完全一致
+  else if(mn.startsWith(q))s=Math.max(s,600);
+  else if(mn.includes(q))s=Math.max(s,500);
+  const ka=toKata(w.kana||'');
+  if(ka===qk)s=Math.max(s,800);
+  else if(ka.startsWith(qk))s=Math.max(s,640-Math.min(ka.length,80));
+  else if(ka.includes(qk))s=Math.max(s,480);
+  const rm=(w.roman||'').toLowerCase();
+  if(rm===lc)s=Math.max(s,780);
+  else if(rm.startsWith(lc))s=Math.max(s,620-Math.min(rm.length,80));
+  else if(rm.includes(lc))s=Math.max(s,460);
+  return s;
+}
 function dictSearch(){
   const q=document.getElementById('dict-q').value.trim();
   document.getElementById('dict-clear').style.display=q?'block':'none';
@@ -4219,12 +4241,10 @@ function dictSearch(){
   if(!q){res=RAW;}
   else{
     const lc=q.toLowerCase(),qk=toKata(q);
-    res=RAW.filter(w=>
-      (w.thai||'').includes(q)||
-      (w.meaning||'').includes(q)||
-      toKata(w.kana||'').includes(qk)||
-      (w.roman||'').toLowerCase().includes(lc)
-    );
+    const scored=[];
+    for(const w of RAW){const s=dictScore(w,q,lc,qk);if(s>0)scored.push([s,w]);}
+    scored.sort((a,b)=>b[0]-a[0]);// 関連度の高い順（同点は元の順を維持＝安定ソート）
+    res=scored.map(x=>x[1]);
   }
   renderDictList(res,q);
 }
