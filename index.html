@@ -3657,7 +3657,8 @@ let wSt=ls('tap_st',{});
 let strk=ls('tap_streak',{dates:[],best:0,cur:0});
 let slog=ls('tap_slog',{sec:0,words:0,todayIds:[],todayDate:'',wkData:{}});
 let pref=ls('tap_pref',{goal:20,timer:0,onboarded:false,bm:[]});
-let cfg={mode:'flip',dir:'thai',order:'random',scope:'all',limit:50,lv:'all',pos:'all'};// 学習設定
+let cfg=Object.assign({mode:'flip',dir:'thai',order:'random',scope:'all',limit:50,lv:'all',pos:'all'},ls('tap_cfg',{}));// 学習設定（前回値を復元）
+function saveCfg(){ss('tap_cfg',cfg);}
 
 (()=>{
   const t=new Date().toISOString().slice(0,10);
@@ -3862,7 +3863,7 @@ function headerBack(){
   switchTab('home');
 }
 function closeCfgOrBack(){headerBack();}
-function goStudyAll(){cfg.lv='all';openCfgForStudy();}
+function goStudyAll(){openCfgForStudy();}// 前回の設定を引き継いで開く
 function openCfgForStudy(){
   // 「学習」タブからは設定モーダルを開く
   ['home','study','dict','dash','settings'].forEach(x=>document.getElementById('nav-'+x)?.classList.remove('active'));
@@ -4061,20 +4062,31 @@ function updateSelected(list) {
   });
 }
 
+// セグメントボタンの選択状態をcfgに同期（再表示時に前回値を反映）
+function syncSeg(segId,key){
+  const seg=document.getElementById(segId);if(!seg)return;
+  seg.querySelectorAll('.cfg-seg-btn').forEach(b=>{
+    const oc=b.getAttribute('onclick')||'';
+    b.classList.toggle('on',oc.indexOf("'"+key+"','"+cfg[key]+"'")>=0);
+  });
+}
 function openCfg(){
   document.getElementById('cfg-ov').classList.add('open');
   document.body.style.overflow='hidden'; // 背景スクロール防止
-  // ピッカー初期化
-  initPicker('pk-lv',  PK_LV,  cfg.lv,    v => { cfg.lv  = v; });
-  initPicker('pk-pos', PK_POS, cfg.pos,   v => { cfg.pos = v; });
-  initPicker('pk-lim', PK_LIM, cfg.limit, v => { cfg.limit = parseInt(v); });
+  // セグメントを前回値に同期
+  syncSeg('seg-mode','mode');syncSeg('seg-dir','dir');syncSeg('seg-scope','scope');syncSeg('seg-order','order');
+  // ピッカー初期化（前回値で初期化）
+  initPicker('pk-lv',  PK_LV,  cfg.lv,    v => { cfg.lv  = v; saveCfg(); });
+  initPicker('pk-pos', PK_POS, cfg.pos,   v => { cfg.pos = v; saveCfg(); });
+  initPicker('pk-lim', PK_LIM, cfg.limit, v => { cfg.limit = parseInt(v); saveCfg(); });
 }
 function closeCfgOv(e){if(e.target.id==='cfg-ov'){document.getElementById('cfg-ov').classList.remove('open');document.body.style.overflow='';}}
-function setCfgSeg(key,val,btn){cfg[key]=val;btn.closest('.cfg-seg').querySelectorAll('.cfg-seg-btn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');}
+function setCfgSeg(key,val,btn){cfg[key]=val;btn.closest('.cfg-seg').querySelectorAll('.cfg-seg-btn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');saveCfg();}
 
 
 
 function applyCfg(){
+  saveCfg();// 選んだ設定を保存して次回に引き継ぐ
   document.getElementById('cfg-ov').classList.remove('open');
   document.body.style.overflow='';
   let f=RAW.filter(w=>(cfg.lv==='all'||w.level===cfg.lv)&&(cfg.pos==='all'||w.pos===cfg.pos));
@@ -4308,6 +4320,9 @@ function renderHome(){
   document.getElementById('hs-lnd').textContent=lnd;
   document.getElementById('hs-rev').textContent=revCnt();
   document.getElementById('word-cnt').textContent=RAW.length;
+  // 「全単語を学習する」ボタンのサブ表示を現在の設定に合わせる
+  const hss=document.getElementById('home-start-sub');
+  if(hss){const om={random:'ランダム順',weak:'苦手優先',score:'スコア順'};hss.textContent=(cfg.lv==='all'?'全レベル':lvL(cfg.lv))+(cfg.scope==='weak'?'・苦手のみ':'')+'・'+(om[cfg.order]||'ランダム順');}
   document.getElementById('stk-n').textContent=strk.cur;
   const goal=pref.goal||20,td=slog.todayIds.length,gp=Math.min(100,Math.round(td/goal*100));
   document.getElementById('goal-lbl').textContent='今日 '+td+'/'+goal+'語';
