@@ -3660,12 +3660,21 @@ let pref=ls('tap_pref',{goal:20,timer:0,onboarded:false,bm:[]});
 let cfg=Object.assign({mode:'flip',dir:'thai',order:'random',scope:'all',limit:50,lv:'all',pos:'all'},ls('tap_cfg',{}));// 学習設定（前回値を復元）
 function saveCfg(){ss('tap_cfg',cfg);}
 
+// 日付はローカル時刻基準(YYYY-MM-DD)。UTCだと時差で日付がずれ連続日数が誤判定されるため
+function localDay(d){d=d||new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+// 連続学習日数を計算（今日未学習なら昨日基準で数え、日中はストリークを維持）
+function calcStreak(){
+  let d=new Date();
+  if(!strk.dates.includes(localDay(d)))d.setDate(d.getDate()-1);
+  let s=0;
+  while(strk.dates.includes(localDay(d))){s++;d.setDate(d.getDate()-1);}
+  return s;
+}
+
 (()=>{
-  const t=new Date().toISOString().slice(0,10);
+  const t=localDay();
   if(slog.todayDate!==t){slog.todayDate=t;slog.todayIds=[];ss('tap_slog',slog);}
-  let s=0,d=new Date();
-  while(strk.dates.includes(d.toISOString().slice(0,10))){s++;d.setDate(d.getDate()-1);}
-  strk.cur=s;
+  strk.cur=calcStreak();
 })();
 let _t0=Date.now();
 
@@ -3704,18 +3713,17 @@ async function bootRAW(){
   }catch(e){idbOK=false;RAW=ls('tap_raw',DEFAULT_RAW);}// IDB非対応時はlocalStorageにフォールバック
 }
 function recStrk(){
-  const t=new Date().toISOString().slice(0,10);
+  const t=localDay();
   if(!strk.dates.includes(t)){strk.dates.push(t);strk.dates.sort();}
-  let s=0,d=new Date();
-  while(strk.dates.includes(d.toISOString().slice(0,10))){s++;d.setDate(d.getDate()-1);}
+  const s=calcStreak();
   if(s>strk.best)strk.best=s;strk.cur=s;ss('tap_streak',strk);
 }
 function recWord(id){
-  const t=new Date().toISOString().slice(0,10);
+  const t=localDay();
   if(!slog.todayIds.includes(id)){
     slog.todayIds.push(id);slog.words++;slog.wkData=slog.wkData||{};slog.wkData[t]=(slog.wkData[t]||0)+1;
     // 30日以上前のwkDataを掃除（メモリ肥大化防止）
-    const cutoff=new Date();cutoff.setDate(cutoff.getDate()-30);const co=cutoff.toISOString().slice(0,10);
+    const cutoff=new Date();cutoff.setDate(cutoff.getDate()-30);const co=localDay(cutoff);
     for(const k in slog.wkData){if(k<co)delete slog.wkData[k];}
   }
 }
@@ -4393,7 +4401,7 @@ function addReminder(){
     rmSt('カレンダーに追加しました（毎日 '+pad(h)+':'+pad(m)+'）',true);
   }catch(err){rmSt('エラー: '+err.message,false);}
 }
-function resetAll(){if(!confirm('進捗をリセットしますか？'))return;wSt={};badWs=[];okWs=[];strk={dates:[],best:0,cur:0};slog={sec:0,words:0,todayIds:[],todayDate:new Date().toISOString().slice(0,10),wkData:{}};_t0=Date.now();save();renderSettings();renderHome();}
+function resetAll(){if(!confirm('進捗をリセットしますか？'))return;wSt={};badWs=[];okWs=[];strk={dates:[],best:0,cur:0};slog={sec:0,words:0,todayIds:[],todayDate:localDay(),wkData:{}};_t0=Date.now();save();renderSettings();renderHome();}
 
 // ── 学習状態 ────────────────────────────────────────────
 let words=[],idx=0,flipped=false;
@@ -4765,7 +4773,7 @@ function renderDash(){
   document.getElementById('d-grid').innerHTML=items.map(it=>'<div class="d-stat"><div style="margin-bottom:8px;color:var(--accent);display:flex;justify-content:center">'+it.i+'</div><div class="d-stat-n">'+it.v+'</div><div class="d-stat-l">'+it.l+'</div></div>').join('');
   // 7日グラフ
   const wkd=slog.wkData||{};const today=new Date();const days=[];
-  for(let i=6;i>=0;i--){const d=new Date(today);d.setDate(d.getDate()-i);const ds=d.toISOString().slice(0,10);days.push({ds,cnt:wkd[ds]||0,isToday:i===0});}
+  for(let i=6;i>=0;i--){const d=new Date(today);d.setDate(d.getDate()-i);const ds=localDay(d);days.push({ds,cnt:wkd[ds]||0,isToday:i===0});}
   const mx=Math.max(...days.map(d=>d.cnt),1);
   document.getElementById('wk-chart').innerHTML=days.map(d=>{
     const h=Math.round(d.cnt/mx*100);const dd=d.ds.slice(5).replace('-','/');
