@@ -3368,7 +3368,7 @@ svg{display:block}
   </div>
   <div class="hero"><div class="hero-label">習得率</div><div class="hero-pct" id="hero-pct">0%</div><div class="hero-bar"><div class="hero-fill" id="hero-fill" style="width:0%"></div></div><div class="hero-sub" id="hero-sub">0 / 0 件 覚えた</div></div>
   <div class="stat-row">
-    <div class="stat-item"><div class="stat-n" id="hs-tot">0</div><div class="stat-l">総単語数</div></div>
+    <div class="stat-item"><div class="stat-n" id="hs-tot">0</div><div class="stat-l">今日覚えた</div></div>
     <div class="stat-item"><div class="stat-n" id="hs-lnd" style="color:var(--good)">0</div><div class="stat-l">覚えた</div></div>
     <div class="stat-item"><div class="stat-n" id="hs-rev" style="color:var(--bad)">0</div><div class="stat-l">要復習</div></div>
   </div>
@@ -3673,7 +3673,7 @@ function calcStreak(){
 
 (()=>{
   const t=localDay();
-  if(slog.todayDate!==t){slog.todayDate=t;slog.todayIds=[];ss('tap_slog',slog);}
+  if(slog.todayDate!==t){slog.todayDate=t;slog.todayIds=[];slog.todayLnd=0;ss('tap_slog',slog);}
   strk.cur=calcStreak();
 })();
 let _t0=Date.now();
@@ -3793,8 +3793,10 @@ function updSt(w,ok){
   if(ok)n=n+1;
   else n=((pref.wrongMode||'reset')==='down')?Math.max(0,n-1):0;
   const after=stFromN(n,T);
+  const newlyMastered=after===STL[3]&&before!==STL[3];// 新たに「覚えた」に到達
+  if(newlyMastered)slog.todayLnd=(slog.todayLnd||0)+1;// 今日覚えた数をカウント
   wSt[w.id]={status:after,n:n};recWord(w.id);save();
-  if(after===STL[3]&&before!==STL[3])showLevelUpToast();
+  if(newlyMastered)showLevelUpToast();
 }
 // 閾値変更時に全単語の状態を再計算
 function recomputeAllSt(){
@@ -4324,7 +4326,7 @@ function renderHome(){
   document.getElementById('hero-pct').textContent=pct+'%';
   document.getElementById('hero-fill').style.width=pct+'%';
   document.getElementById('hero-sub').textContent=lnd+' / '+tot+' 件 覚えた';
-  document.getElementById('hs-tot').textContent=tot;
+  document.getElementById('hs-tot').textContent=slog.todayLnd||0;// 今日覚えた数
   document.getElementById('hs-lnd').textContent=lnd;
   document.getElementById('hs-rev').textContent=revCnt();
   document.getElementById('word-cnt').textContent=RAW.length;
@@ -4401,7 +4403,7 @@ function addReminder(){
     rmSt('カレンダーに追加しました（毎日 '+pad(h)+':'+pad(m)+'）',true);
   }catch(err){rmSt('エラー: '+err.message,false);}
 }
-function resetAll(){if(!confirm('進捗をリセットしますか？'))return;wSt={};badWs=[];okWs=[];strk={dates:[],best:0,cur:0};slog={sec:0,words:0,todayIds:[],todayDate:localDay(),wkData:{}};_t0=Date.now();save();renderSettings();renderHome();}
+function resetAll(){if(!confirm('進捗をリセットしますか？'))return;wSt={};badWs=[];okWs=[];strk={dates:[],best:0,cur:0};slog={sec:0,words:0,todayIds:[],todayLnd:0,todayDate:localDay(),wkData:{}};_t0=Date.now();save();renderSettings();renderHome();}
 
 // ── 学習状態 ────────────────────────────────────────────
 let words=[],idx=0,flipped=false;
