@@ -3657,7 +3657,8 @@ let wSt=ls('tap_st',{});
 let strk=ls('tap_streak',{dates:[],best:0,cur:0});
 let slog=ls('tap_slog',{sec:0,words:0,todayIds:[],todayDate:'',wkData:{}});
 let pref=ls('tap_pref',{goal:20,timer:0,onboarded:false,bm:[]});
-let cfg=Object.assign({mode:'flip',dir:'thai',order:'random',scope:'all',limit:50,lv:'all',pos:'all'},ls('tap_cfg',{}));// 学習設定（前回値を復元）
+let cfg=Object.assign({mode:'flip',dir:'thai',order:'random',scope:'all',limit:20,lv:'all',pos:'all'},ls('tap_cfg',{}));// 学習設定（前回値を復元）
+if(![5,10,20].includes(cfg.limit))cfg.limit=20;// 旧設定(50/100/全件)は最大20にクランプ
 function saveCfg(){ss('tap_cfg',cfg);}
 
 // 日付はローカル時刻基準(YYYY-MM-DD)。UTCだと時差で日付がずれ連続日数が誤判定されるため
@@ -4034,7 +4035,7 @@ function _start(wl,label,isCh){
 // ── ドラム式ピッカー ──────────────────────────────────
 const PK_LV  = [{v:'all',l:'全レベル'},{v:'A1',l:'5級'},{v:'A2',l:'4級'},{v:'B1',l:'3級'},{v:'B2',l:'3級+'},{v:'C1',l:'2級'},{v:'C2',l:'1級'}];
 const PK_POS = [{v:'all',l:'全品詞'},{v:'名詞',l:'名詞'},{v:'動詞',l:'動詞'},{v:'形容詞',l:'形容詞'},{v:'副詞',l:'副詞'},{v:'挨拶',l:'挨拶'},{v:'代名詞',l:'代名詞'},{v:'その他',l:'その他'}];
-const PK_LIM = [{v:20,l:'20枚'},{v:50,l:'50枚'},{v:100,l:'100枚'},{v:9999,l:'全件'}];
+const PK_LIM = [{v:5,l:'5枚'},{v:10,l:'10枚'},{v:20,l:'20枚'}];
 
 function initPicker(listId, items, currentVal, onSelect) {
   const list = document.getElementById(listId);
