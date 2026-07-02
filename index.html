@@ -3769,6 +3769,16 @@ function speak(t){if(!window.speechSynthesis)return;speechSynthesis.cancel();con
 function spkBtn(thai,mt){return '<button class="spk" onclick="speak(\''+(thai||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\')"'+(mt?' style="margin-top:12px"':'')+'><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L13 19V5L7.5 9.5z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg></button>';}
 const lvL=lv=>LVN[lv]||lv;
 const showKana=()=>pref.showKana!==false;// カタカナ読みを表示するか（既定:表示）
+// タイ語(.word-main)が長い場合、1行に収まるようフォントを自動縮小（折り返し防止）
+function fitWords(scope){
+  (scope||document).querySelectorAll('.word-main').forEach(el=>{
+    let max=parseFloat(getComputedStyle(el).fontSize)||48;
+    el.style.whiteSpace='nowrap';el.style.wordBreak='normal';el.style.fontSize=max+'px';
+    let s=max;
+    while(s>22&&el.scrollWidth>el.clientWidth+1){s-=2;el.style.fontSize=s+'px';}
+    if(el.scrollWidth>el.clientWidth+1){el.style.whiteSpace='normal';el.style.wordBreak='break-all';}// 最小でも入らなければ折り返し
+  });
+}
 const getSt=id=>(wSt[id]&&wSt[id].status)||'苦手';
 // ── 判定アルゴリズム（設定画面で変更可能）──
 // pref.masterN : 「覚えた」と判定する連続正解回数（1〜5・既定2）
@@ -4488,6 +4498,7 @@ function showCard(){
       +'<div class="word-roman">'+Rm+'</div>'
       +SP;
   }
+  requestAnimationFrame(()=>fitWords(document.getElementById('flip-card')));// 長いタイ語を1行に収める
   startTmr('flip-tmr',()=>{if(!flipped)flipCard();});
   setupSwipe();
 }
@@ -4585,6 +4596,7 @@ function showQz(){
       qSt[ok?'c':'w']++;updSt(w,ok);recStrk();if(!ok)badWs.push(w);updRvBnr(['rv-bar-qz']);
       clearTimeout(tmrID);setTimeout(()=>{idx++;showQz();},700);};
     od.appendChild(btn);});
+  requestAnimationFrame(()=>fitWords(document.getElementById('qz-q')));// 長いタイ語を1行に収める
   startTmr('qz-tmr',()=>{if(!qAns){qAns=true;Array.from(od.children).forEach(b=>b.style.pointerEvents='none');qSt.w++;updSt(w,false);badWs.push(w);updRvBnr(['rv-bar-qz']);setTimeout(()=>{idx++;showQz();},700);}});
 }
 
@@ -4608,6 +4620,7 @@ function showType(){
   const inp=document.getElementById('tp-inp');inp.value='';inp.className='type-inp';
   inp.placeholder=aT?'日本語で意味を入力':'タイ語をローマ字で入力';
   inp.onkeydown=e=>{if(e.key==='Enter')checkType();};
+  requestAnimationFrame(()=>fitWords(document.getElementById('tp-q')));// 長いタイ語を1行に収める
   setTimeout(()=>inp.focus(),200);
 }
 function checkType(){
