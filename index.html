@@ -3771,10 +3771,15 @@ const shuf=a=>{const b=[...a];for(let i=b.length-1;i>0;i--){const j=0|Math.rando
 function speak(t){if(!window.speechSynthesis)return;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='th-TH';u.rate=.85;const v=speechSynthesis.getVoices().find(x=>x.lang==='th-TH'||x.lang==='th');if(v)u.voice=v;speechSynthesis.speak(u);}
 // ── 効果音（Web Audio APIで生成・ファイル不要）──
 let _actx=null;
-function _ac(){try{if(!_actx)_actx=new(window.AudioContext||window.webkitAudioContext)();if(_actx.state==='suspended')_actx.resume();}catch{}return _actx;}
-function _beep(freq,start,dur,type,gain){const ac=_ac();if(!ac)return;const o=ac.createOscillator(),g=ac.createGain();o.type=type||'sine';o.frequency.value=freq;o.connect(g);g.connect(ac.destination);const t=ac.currentTime+start;g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(gain||0.2,t+0.012);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);o.start(t);o.stop(t+dur+0.02);}
-function playCorrect(){if(pref.sfx===false)return;_beep(988,0,0.15,'sine',0.28);_beep(1319,0.13,0.22,'sine',0.28);}// ピンポン♪
-function playWrong(){if(pref.sfx===false)return;_beep(196,0,0.3,'square',0.16);_beep(146,0.0,0.34,'sawtooth',0.12);}// ブー
+function _ac(){try{if(!_actx)_actx=new(window.AudioContext||window.webkitAudioContext)();if(_actx.state==='suspended'){const p=_actx.resume();if(p&&p.catch)p.catch(()=>{});}}catch{}return _actx;}
+// iOSはユーザー操作でAudioContextを解錠しないと音が出ないため、最初のタップで無音を鳴らして解錠
+function _unlockAudio(){const ac=_ac();try{if(ac){const o=ac.createOscillator(),g=ac.createGain();g.gain.value=0.00001;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+0.02);}}catch{}
+  if(ac&&ac.state==='running'){document.removeEventListener('pointerdown',_unlockAudio);document.removeEventListener('touchstart',_unlockAudio);}}
+document.addEventListener('pointerdown',_unlockAudio);
+document.addEventListener('touchstart',_unlockAudio,{passive:true});
+function _beep(freq,start,dur,type,gain){const ac=_ac();if(!ac)return;const o=ac.createOscillator(),g=ac.createGain();o.type=type||'sine';o.frequency.value=freq;o.connect(g);g.connect(ac.destination);const t=ac.currentTime+0.02+start;g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(gain||0.2,t+0.015);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);o.start(t);o.stop(t+dur+0.03);}
+function playCorrect(){if(pref.sfx===false)return;_beep(784,0,0.14,'triangle',0.45);_beep(1047,0.13,0.3,'triangle',0.5);}// ピンポン♪(ソ→ド)
+function playWrong(){if(pref.sfx===false)return;_beep(196,0,0.32,'square',0.3);_beep(147,0.02,0.36,'sawtooth',0.2);}// ブー
 // 発音ボタン（onclick内のタイ語をJS文字列として安全にエスケープ）
 function spkBtn(thai,mt){return '<button class="spk" onclick="speak(\''+(thai||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\')"'+(mt?' style="margin-top:12px"':'')+'><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L13 19V5L7.5 9.5z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg></button>';}
 const lvL=lv=>LVN[lv]||lv;
