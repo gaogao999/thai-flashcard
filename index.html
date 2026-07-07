@@ -3769,17 +3769,31 @@ function pickDistractors(w, pool3){
 
 const shuf=a=>{const b=[...a];for(let i=b.length-1;i>0;i--){const j=0|Math.random()*(i+1);[b[i],b[j]]=[b[j],b[i]];}return b;};
 function speak(t){if(!window.speechSynthesis)return;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='th-TH';u.rate=.85;const v=speechSynthesis.getVoices().find(x=>x.lang==='th-TH'||x.lang==='th');if(v)u.voice=v;speechSynthesis.speak(u);}
-// ── 効果音（Web Audio APIで生成・ファイル不要）──
-let _actx=null;
-function _ac(){try{if(!_actx)_actx=new(window.AudioContext||window.webkitAudioContext)();if(_actx.state==='suspended'){const p=_actx.resume();if(p&&p.catch)p.catch(()=>{});}}catch{}return _actx;}
-// iOSはユーザー操作でAudioContextを解錠しないと音が出ないため、最初のタップで無音を鳴らして解錠
-function _unlockAudio(){const ac=_ac();try{if(ac){const o=ac.createOscillator(),g=ac.createGain();g.gain.value=0.00001;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+0.02);}}catch{}
-  if(ac&&ac.state==='running'){document.removeEventListener('pointerdown',_unlockAudio);document.removeEventListener('touchstart',_unlockAudio);}}
+// ── 効果音（WAVを合成しHTMLAudioで再生：iOSでWeb Audioより鳴りやすい）──
+const _SR=22050;
+function _synthWav(notes,dur){// notes:[{f,start,len,gain,type}]
+  const n=Math.floor(_SR*dur),buf=new Float32Array(n);
+  notes.forEach(s=>{const s0=Math.floor(s.start*_SR),s1=Math.min(n,Math.floor((s.start+s.len)*_SR));
+    for(let i=s0;i<s1;i++){const tt=(i-s0)/_SR;const atk=Math.min(1,tt/0.008),dec=Math.exp(-tt/(s.len*0.6));const env=atk*dec;
+      const ph=2*Math.PI*s.f*tt;let v=s.type==='square'?(Math.sin(ph)>=0?1:-1):Math.sin(ph);buf[i]+=v*s.gain*env;}});
+  const ab=new ArrayBuffer(44+n*2),dv=new DataView(ab),W=(o,s)=>{for(let i=0;i<s.length;i++)dv.setUint8(o+i,s.charCodeAt(i));};
+  W(0,'RIFF');dv.setUint32(4,36+n*2,true);W(8,'WAVE');W(12,'fmt ');dv.setUint32(16,16,true);dv.setUint16(20,1,true);dv.setUint16(22,1,true);dv.setUint32(24,_SR,true);dv.setUint32(28,_SR*2,true);dv.setUint16(32,2,true);dv.setUint16(34,16,true);W(36,'data');dv.setUint32(40,n*2,true);
+  let o=44;for(let i=0;i<n;i++){let v=Math.max(-1,Math.min(1,buf[i]));dv.setInt16(o,v*32767,true);o+=2;}
+  let bin='';const by=new Uint8Array(ab);for(let i=0;i<by.length;i++)bin+=String.fromCharCode(by[i]);
+  return 'data:audio/wav;base64,'+btoa(bin);
+}
+let _sndC=null,_sndW=null;
+function _initSnd(){if(_sndC)return;
+  _sndC=new Audio(_synthWav([{f:784,start:0,len:0.14,gain:0.5,type:'sine'},{f:1047,start:0.12,len:0.32,gain:0.55,type:'sine'}],0.46));
+  _sndW=new Audio(_synthWav([{f:196,start:0,len:0.33,gain:0.5,type:'square'},{f:147,start:0.03,len:0.34,gain:0.32,type:'square'}],0.4));
+  _sndC.preload='auto';_sndW.preload='auto';
+}
+// iOSは最初のユーザー操作でメディアを解錠（無音再生）
+function _unlockAudio(){_initSnd();[_sndC,_sndW].forEach(a=>{try{const v=a.volume;a.volume=0;const p=a.play();if(p&&p.then)p.then(()=>{a.pause();a.currentTime=0;a.volume=v;}).catch(()=>{a.volume=v;});else{a.pause();a.currentTime=0;a.volume=v;}}catch{}});document.removeEventListener('pointerdown',_unlockAudio);document.removeEventListener('touchstart',_unlockAudio);}
 document.addEventListener('pointerdown',_unlockAudio);
 document.addEventListener('touchstart',_unlockAudio,{passive:true});
-function _beep(freq,start,dur,type,gain){const ac=_ac();if(!ac)return;const o=ac.createOscillator(),g=ac.createGain();o.type=type||'sine';o.frequency.value=freq;o.connect(g);g.connect(ac.destination);const t=ac.currentTime+0.02+start;g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(gain||0.2,t+0.015);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);o.start(t);o.stop(t+dur+0.03);}
-function playCorrect(){if(pref.sfx===false)return;_beep(784,0,0.14,'triangle',0.45);_beep(1047,0.13,0.3,'triangle',0.5);}// ピンポン♪(ソ→ド)
-function playWrong(){if(pref.sfx===false)return;_beep(196,0,0.32,'square',0.3);_beep(147,0.02,0.36,'sawtooth',0.2);}// ブー
+function playCorrect(){if(pref.sfx===false)return;_initSnd();try{_sndC.currentTime=0;const p=_sndC.play();if(p&&p.catch)p.catch(()=>{});}catch{}}// ピンポン♪
+function playWrong(){if(pref.sfx===false)return;_initSnd();try{_sndW.currentTime=0;const p=_sndW.play();if(p&&p.catch)p.catch(()=>{});}catch{}}// ブー
 // 発音ボタン（onclick内のタイ語をJS文字列として安全にエスケープ）
 function spkBtn(thai,mt){return '<button class="spk" onclick="speak(\''+(thai||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\')"'+(mt?' style="margin-top:12px"':'')+'><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L13 19V5L7.5 9.5z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg></button>';}
 const lvL=lv=>LVN[lv]||lv;
