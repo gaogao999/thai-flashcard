@@ -3199,6 +3199,8 @@ svg{display:block}
 .quiz-q{padding:24px;background:var(--bg);border-bottom:1px solid var(--bg2);text-align:center;min-height:180px;max-height:46vh;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .quiz-opts{display:flex;flex-direction:column;gap:0;padding-top:8px;padding-bottom:8px}
 .quiz-opt{padding:14px 16px;margin:0 16px 10px;border:1.5px solid var(--bg2);border-radius:14px;background:var(--bg);font-size:15px;font-weight:600;color:var(--ink);cursor:pointer;text-align:left;display:flex;align-items:center;gap:12px;transition:border-color .1s}
+.qz-dk{margin:4px 16px 12px;padding:12px;border:1.5px dashed var(--bg2);border-radius:14px;background:transparent;font-size:14px;font-weight:600;color:var(--ink3);cursor:pointer;text-align:center}
+.qz-dk:disabled{opacity:.4;cursor:default}
 .quiz-opt:active{background:var(--bg2);border-color:var(--ink3)}
 .quiz-opt-num{width:30px;height:30px;border-radius:50%;background:var(--accent-light);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;color:var(--accent)}
 
@@ -3442,6 +3444,7 @@ svg{display:block}
   <div class="quiz-area" id="quiz-area">
     <div class="quiz-q" id="qz-q"></div>
     <div class="quiz-opts" id="qz-opts"></div>
+    <button class="qz-dk" id="qz-dk" onclick="quizDontKnow()">わからない</button>
   </div>
 </div>
 
@@ -4577,6 +4580,7 @@ const QZ_NUMS=['①','②','③','④'];
 function showQz(){
   if(idx>=words.length){showResult();return;}
   const w=words[idx];qAns=false;
+  const dk=document.getElementById('qz-dk');if(dk)dk.disabled=false;// 「わからない」を再有効化
   updProg('qz-bar','qz-prog');updRvBnr(['rv-bar-qz']);
   const aT=cfg.dir==='thai';const st=getSt(w.id);
   const bmBtn='';
@@ -4604,7 +4608,18 @@ function showQz(){
       clearTimeout(tmrID);setTimeout(()=>{idx++;showQz();},700);};
     od.appendChild(btn);});
   requestAnimationFrame(()=>{fitWords(document.getElementById('qz-q'));fitFace(document.getElementById('qz-q'));});// タイ語1行・意味は枠内
-  startTmr('qz-tmr',()=>{if(!qAns){qAns=true;Array.from(od.children).forEach(b=>b.style.pointerEvents='none');qSt.w++;updSt(w,false);badWs.push(w);updRvBnr(['rv-bar-qz']);setTimeout(()=>{idx++;showQz();},700);}});
+  startTmr('qz-tmr',()=>{if(!qAns){qAns=true;const dkb=document.getElementById('qz-dk');if(dkb)dkb.disabled=true;Array.from(od.children).forEach(b=>b.style.pointerEvents='none');qSt.w++;updSt(w,false);badWs.push(w);updRvBnr(['rv-bar-qz']);setTimeout(()=>{idx++;showQz();},700);}});
+}
+// 「わからない」= 不正解扱い。正解を表示して次へ
+function quizDontKnow(){
+  if(qAns)return;qAns=true;
+  const w=words[idx];const aT=cfg.dir==='thai';const ct=aT?w.meaning:w.thai;
+  const od=document.getElementById('qz-opts');
+  Array.from(od.children).forEach(b=>{b.style.pointerEvents='none';const sp=b.querySelector('span');
+    if(sp&&sp.textContent===ct){b.style.background='var(--good-bg)';const n=b.querySelector('.quiz-opt-num');if(n){n.style.background='var(--good)';n.style.color='#fff';}}});
+  const dk=document.getElementById('qz-dk');if(dk)dk.disabled=true;
+  qSt.w++;updSt(w,false);recStrk();badWs.push(w);updRvBnr(['rv-bar-qz']);
+  clearTimeout(tmrID);setTimeout(()=>{idx++;showQz();},900);
 }
 
 // ── タイピング ────────────────────────────────────────────
