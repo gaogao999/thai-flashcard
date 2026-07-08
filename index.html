@@ -3247,7 +3247,7 @@ svg{display:block}
 .d-section{padding:14px 16px;border-bottom:1px solid var(--bg2);background:var(--bg)}
 .d-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .d-row:last-child{margin-bottom:0}
-.d-lbl{width:50px;font-size:12px;font-weight:700;text-align:right;flex-shrink:0}
+.d-lbl{width:58px;font-size:12px;font-weight:700;text-align:right;flex-shrink:0;white-space:nowrap}
 .d-bar{flex:1;background:var(--bg2);border-radius:3px;height:10px;overflow:hidden}
 .d-bar-fill{height:10px;border-radius:3px;transition:width .6s cubic-bezier(.2,.8,.3,1)}
 .d-cnt{width:88px;font-size:10px;color:var(--ink3);text-align:right;flex-shrink:0;font-weight:600}
@@ -3501,8 +3501,8 @@ svg{display:block}
   <div class="d-section" id="d-lv"></div>
   <div style="font-size:12px;font-weight:700;color:var(--ink3);padding:14px 16px 8px;letter-spacing:.05em;border-bottom:1px solid var(--bg2)">品詞別</div>
   <div class="d-section" id="d-pos"></div>
-  <div style="font-size:12px;font-weight:700;color:var(--ink3);padding:14px 16px 8px;letter-spacing:.05em;border-bottom:1px solid var(--bg2)">品詞 × レベル</div>
-  <div class="d-section" id="d-mx" style="overflow-x:auto"></div>
+  <div style="font-size:12px;font-weight:700;color:var(--ink3);padding:14px 16px 8px;letter-spacing:.05em;border-bottom:1px solid var(--bg2)">品詞 × レベル　<span style="font-size:10px;font-weight:600;color:var(--ink4)">→ 横にスクロール</span></div>
+  <div class="d-section" id="d-mx" style="overflow-x:auto;-webkit-overflow-scrolling:touch"></div>
   <div style="font-size:11px;color:var(--ink4);padding:14px;text-align:center">「覚えた」を習得率としてカウント</div>
 </div>
 
@@ -4877,14 +4877,16 @@ function renderDash(){
   // マトリクス（1パス集計）
   const mxStats={};
   for(const w of RAW){const k=w.pos+'|'+w.level;if(!mxStats[k])mxStats[k]={t:0,d:0};mxStats[k].t++;if(getSt(w.id)==='覚えた')mxStats[k].d++;}
-  let mx2='<table style="width:100%;border-collapse:collapse;font-size:10px"><tr><th style="padding:4px 8px 4px 0;text-align:left;color:var(--ink4);font-weight:600;border-bottom:1px solid var(--bg2)"></th>';
-  LVS.forEach(lv=>{mx2+='<th style="padding:4px 3px;text-align:center;color:'+LVC[lv]+';border-bottom:1px solid var(--bg2);font-weight:700">'+lvL(lv)+'</th>';});mx2+='</tr>';
+  const lvSh=lv=>(LVN[lv]||lv).replace('級','');// 短縮ラベル(5,4,3,3+,準2,準2+,2,2+,1,1+)
+  const stk='position:sticky;left:0;background:var(--bg);z-index:1;';// 品詞列を固定
+  let mx2='<table style="border-collapse:collapse;font-size:11px"><tr><th style="'+stk+'padding:4px 10px 4px 4px;text-align:left;color:var(--ink4);font-weight:600;border-bottom:1px solid var(--bg2)"></th>';
+  LVS.forEach(lv=>{mx2+='<th style="padding:4px 5px;text-align:center;color:'+LVC[lv]+';border-bottom:1px solid var(--bg2);font-weight:700;min-width:38px">'+lvSh(lv)+'</th>';});mx2+='</tr>';
   pv.forEach(pos=>{
-    mx2+='<tr><td style="padding:6px 8px 6px 0;color:var(--ink2);font-weight:600;border-bottom:1px solid var(--bg2);white-space:nowrap">'+pos+'</td>';
+    mx2+='<tr><td style="'+stk+'padding:6px 10px 6px 4px;color:var(--ink2);font-weight:600;border-bottom:1px solid var(--bg2);white-space:nowrap">'+pos+'</td>';
     LVS.forEach(lv=>{const s=mxStats[pos+'|'+lv]||{t:0,d:0};const t=s.t,d=s.d;
       const p=t>0?Math.round(d/t*100):0;const bg=p===100?'var(--good-bg)':p>0?'var(--blue-bg)':'transparent';const col=p===100?'var(--good)':p>0?'var(--blue)':'var(--ink4)';
-      mx2+=t>0?'<td style="padding:5px 3px;text-align:center;background:'+bg+';border-bottom:1px solid var(--bg2)"><span style="color:'+col+';font-weight:700">'+p+'%</span><br><span style="color:var(--ink4);font-size:9px">'+d+'/'+t+'</span></td>'
-        :'<td style="padding:5px 3px;text-align:center;color:var(--bg2);border-bottom:1px solid var(--bg2)">–</td>';});mx2+='</tr>';});
+      mx2+=t>0?'<td style="padding:5px 5px;text-align:center;background:'+bg+';border-bottom:1px solid var(--bg2);min-width:38px"><span style="color:'+col+';font-weight:700">'+p+'%</span><br><span style="color:var(--ink4);font-size:9px">'+d+'/'+t+'</span></td>'
+        :'<td style="padding:5px 5px;text-align:center;color:var(--bg2);border-bottom:1px solid var(--bg2);min-width:38px">–</td>';});mx2+='</tr>';});
   document.getElementById('d-mx').innerHTML=mx2+'</table>';
 }
 
