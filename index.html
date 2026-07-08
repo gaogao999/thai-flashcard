@@ -3247,7 +3247,7 @@ svg{display:block}
 .d-section{padding:14px 16px;border-bottom:1px solid var(--bg2);background:var(--bg)}
 .d-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .d-row:last-child{margin-bottom:0}
-.d-lbl{width:50px;font-size:12px;font-weight:700;text-align:right;flex-shrink:0}
+.d-lbl{width:58px;font-size:12px;font-weight:700;text-align:right;flex-shrink:0;white-space:nowrap}
 .d-bar{flex:1;background:var(--bg2);border-radius:3px;height:10px;overflow:hidden}
 .d-bar-fill{height:10px;border-radius:3px;transition:width .6s cubic-bezier(.2,.8,.3,1)}
 .d-cnt{width:88px;font-size:10px;color:var(--ink3);text-align:right;flex-shrink:0;font-weight:600}
@@ -3501,8 +3501,8 @@ svg{display:block}
   <div class="d-section" id="d-lv"></div>
   <div style="font-size:12px;font-weight:700;color:var(--ink3);padding:14px 16px 8px;letter-spacing:.05em;border-bottom:1px solid var(--bg2)">品詞別</div>
   <div class="d-section" id="d-pos"></div>
-  <div style="font-size:12px;font-weight:700;color:var(--ink3);padding:14px 16px 8px;letter-spacing:.05em;border-bottom:1px solid var(--bg2)">品詞 × レベル</div>
-  <div class="d-section" id="d-mx" style="overflow-x:auto"></div>
+  <div style="font-size:12px;font-weight:700;color:var(--ink3);padding:14px 16px 8px;letter-spacing:.05em;border-bottom:1px solid var(--bg2)">品詞 × レベル　<span style="font-size:10px;font-weight:600;color:var(--ink4)">→ 横にスクロール</span></div>
+  <div class="d-section" id="d-mx" style="overflow-x:auto;-webkit-overflow-scrolling:touch"></div>
   <div style="font-size:11px;color:var(--ink4);padding:14px;text-align:center">「覚えた」を習得率としてカウント</div>
 </div>
 
@@ -3628,11 +3628,21 @@ svg{display:block}
 
 <script>
 // ── 定数 ──────────────────────────────────────────────
-const LVS=['A1','A2','B1','B2','C1','C2'];
-const LVN={A1:'5級',A2:'4級',B1:'3級',B2:'3級+',C1:'2級',C2:'1級'};
-const LVC={A1:'#C56A45',A2:'#B65C3A',B1:'#A8542F',B2:'#934B2B',C1:'#7E4427',C2:'#6B3B22'};
-const KT={A1:'タイ検5級',A2:'タイ検4級',B1:'タイ検3級',B2:'タイ検3級+',C1:'タイ検2級',C2:'タイ検1級'};
+const LVS=['A1','A2','B1','B2','B3','B4','C1','C2','C3','C4'];
+const LVN={A1:'5級',A2:'4級',B1:'3級',B2:'3級+',B3:'準2級',B4:'準2級+',C1:'2級',C2:'2級+',C3:'1級',C4:'1級+'};
+const LVC={A1:'#C56A45',A2:'#BC6038',B1:'#B0562F',B2:'#A44E2B',B3:'#984728',B4:'#8C4125',C1:'#803B22',C2:'#71351F',C3:'#62301C',C4:'#532A19'};
+const KT={A1:'タイ検5級',A2:'タイ検4級',B1:'タイ検3級',B2:'タイ検3級+',B3:'タイ検準2級',B4:'タイ検準2級+',C1:'タイ検2級',C2:'タイ検2級+',C3:'タイ検1級',C4:'タイ検1級+'};
 const POS=['名詞','動詞','形容詞','副詞','挨拶','代名詞','その他'];
+// レベル割当: 5級/4級はスコア基準、3級以上(score<29)は件数で均等8分割（各級が同数になるように）
+function assignLevels(ws){
+  const sub=['B1','B2','B3','B4','C1','C2','C3','C4'];
+  ws.forEach(w=>{const n=parseInt(w.score);w.level=n>=32?'A1':(n>=29?'A2':'');});
+  const low=ws.filter(w=>!w.level);
+  low.sort((a,b)=>{const d=(parseInt(b.score)||0)-(parseInt(a.score)||0);return d||((parseInt(a.id)||0)-(parseInt(b.id)||0));});
+  const per=Math.ceil(low.length/8)||1;
+  low.forEach((w,i)=>{w.level=sub[Math.min(7,Math.floor(i/per))];});
+  return ws;
+}
 const STL=['苦手','うろ覚え','ほぼ覚えた','覚えた'];
 const STC={'苦手':'var(--bad)','うろ覚え':'var(--warn)','ほぼ覚えた':'var(--blue)','覚えた':'var(--good)'};
 const STB={'苦手':'var(--bad-bg)','うろ覚え':'var(--warn-bg)','ほぼ覚えた':'var(--blue-bg)','覚えた':'var(--good-bg)'};
@@ -3685,7 +3695,7 @@ let _t0=Date.now();
 
 function save(){if(idbOK)idbSet('tap_raw',RAW).catch(()=>{});else ss('tap_raw',RAW);ss('tap_st',wSt);ss('tap_streak',strk);ss('tap_slog',slog);ss('tap_pref',pref);}
 // 同梱辞書の版。words.json更新時にこの数字を上げると既存利用者も最新版に更新される
-const SEED_VER=3;
+const SEED_VER=5;
 // 同梱の辞書(words.json 約1.8万語)を読み込む。?vでSWの古いキャッシュを回避。失敗時はnull
 async function loadSeed(){
   try{const res=await fetch('words.json?v='+SEED_VER,{cache:'no-store'});if(res.ok){const arr=await res.json();if(Array.isArray(arr)&&arr.length)return arr;}}catch{}
@@ -3886,8 +3896,8 @@ function computePosStats(){
   for(const w of RAW){const p=w.pos;if(!r[p])r[p]={tot:0,lnd:0};r[p].tot++;if(getSt(w.id)==='覚えた')r[p].lnd++;}
   return r;
 }
-const isBM=id=>pref.bm.includes(id);
-function togBM(id,el){if(isBM(id))pref.bm=pref.bm.filter(x=>x!==id);else pref.bm.push(id);save();el.textContent=isBM(id)?'⭐':'☆';}
+const isBM=id=>(pref.bm||(pref.bm=[])).includes(id);
+function togBM(id,el){if(!pref.bm)pref.bm=[];if(isBM(id))pref.bm=pref.bm.filter(x=>x!==id);else pref.bm.push(id);save();el.textContent=isBM(id)?'⭐':'☆';}
 
 // ── OB ────────────────────────────────────────────────
 const obD={};
@@ -4079,7 +4089,7 @@ function _start(wl,label,isCh){
 
 // ── 学習設定モーダル ──────────────────────────────────
 // ── ドラム式ピッカー ──────────────────────────────────
-const PK_LV  = [{v:'all',l:'全レベル'},{v:'A1',l:'5級'},{v:'A2',l:'4級'},{v:'B1',l:'3級'},{v:'B2',l:'3級+'},{v:'C1',l:'2級'},{v:'C2',l:'1級'}];
+const PK_LV  = [{v:'all',l:'全レベル'},{v:'A1',l:'5級'},{v:'A2',l:'4級'},{v:'B1',l:'3級'},{v:'B2',l:'3級+'},{v:'B3',l:'準2級'},{v:'B4',l:'準2級+'},{v:'C1',l:'2級'},{v:'C2',l:'2級+'},{v:'C3',l:'1級'},{v:'C4',l:'1級+'}];
 const PK_POS = [{v:'all',l:'全品詞'},{v:'名詞',l:'名詞'},{v:'動詞',l:'動詞'},{v:'形容詞',l:'形容詞'},{v:'副詞',l:'副詞'},{v:'挨拶',l:'挨拶'},{v:'代名詞',l:'代名詞'},{v:'その他',l:'その他'}];
 const PK_LIM = [{v:5,l:'5枚'},{v:10,l:'10枚'},{v:20,l:'20枚'}];
 
@@ -4206,13 +4216,12 @@ function loadCSV(e){
       const rows=parseCSV(txt);const hdr=rows[0];const im={};hdr.forEach((h,i)=>im[h.trim()]=i);
       const req=['id','thai','kana','roman','meaning','pos','score'];
       const miss=req.filter(k=>!(k in im));if(miss.length){csvSt('列なし: '+miss.join(', '),false);return;}
-      const gc=s=>{const n=parseInt(s);if(n>=32)return'A1';if(n>=29)return'A2';if(n>=26)return'B1';if(n>=23)return'B2';if(n>=17)return'C1';return'C2';};
       // 複数意味は区切り(, ， 、)を「、」に統一して全て保持
       const norm=s=>(s||'').trim().replace(/\s*[,，]\s*/g,'、').replace(/、+/g,'、').replace(/^、+|、+$/g,'');
       const gx=(r,k)=>im[k]!=null&&r[im[k]]?r[im[k]]:'';// 列があり値があれば取得
       const nw=rows.slice(1).map(r=>{const sc=parseInt(r[im.score])||0;
         const o={id:r[im.id],thai:r[im.thai],kana:im.kana!=null?r[im.kana]:'',roman:im.roman!=null?r[im.roman]:'',
-          meaning:norm(r[im.meaning]),pos:r[im.pos]||'その他',level:gc(sc),score:sc};
+          meaning:norm(r[im.meaning]),pos:r[im.pos]||'その他',level:'',score:sc};
         // 例文 ex1/ex2/ex3 を整形・復元し、有効なものだけを詰め直す
         const exs=[];
         ['ex1','ex2','ex3'].forEach(p=>{const fx=fixExample(gx(r,p+'_thai'),gx(r,p+'_kana'),gx(r,p+'_roman'),gx(r,p+'_meaning'),gx(r,p+'_thai_words'));if(fx)exs.push(fx);});
@@ -4220,6 +4229,7 @@ function loadCSV(e){
         return o;
       }).filter(w=>w.thai&&w.meaning);
       if(!nw.length){csvSt('単語なし',false);return;}
+      assignLevels(nw);// 3級以上を件数で均等分割
       RAW=nw;wSt={};save();document.getElementById('word-cnt').textContent=RAW.length;
       csvSt(''+RAW.length+'件 完了！',true);renderHome();
     }catch(err){csvSt(''+err.message,false);}
@@ -4867,14 +4877,16 @@ function renderDash(){
   // マトリクス（1パス集計）
   const mxStats={};
   for(const w of RAW){const k=w.pos+'|'+w.level;if(!mxStats[k])mxStats[k]={t:0,d:0};mxStats[k].t++;if(getSt(w.id)==='覚えた')mxStats[k].d++;}
-  let mx2='<table style="width:100%;border-collapse:collapse;font-size:10px"><tr><th style="padding:4px 8px 4px 0;text-align:left;color:var(--ink4);font-weight:600;border-bottom:1px solid var(--bg2)"></th>';
-  LVS.forEach(lv=>{mx2+='<th style="padding:4px 3px;text-align:center;color:'+LVC[lv]+';border-bottom:1px solid var(--bg2);font-weight:700">'+lvL(lv)+'</th>';});mx2+='</tr>';
+  const lvSh=lv=>(LVN[lv]||lv).replace('級','');// 短縮ラベル(5,4,3,3+,準2,準2+,2,2+,1,1+)
+  const stk='position:sticky;left:0;background:var(--bg);z-index:1;';// 品詞列を固定
+  let mx2='<table style="border-collapse:collapse;font-size:11px"><tr><th style="'+stk+'padding:4px 10px 4px 4px;text-align:left;color:var(--ink4);font-weight:600;border-bottom:1px solid var(--bg2)"></th>';
+  LVS.forEach(lv=>{mx2+='<th style="padding:4px 5px;text-align:center;color:'+LVC[lv]+';border-bottom:1px solid var(--bg2);font-weight:700;min-width:38px">'+lvSh(lv)+'</th>';});mx2+='</tr>';
   pv.forEach(pos=>{
-    mx2+='<tr><td style="padding:6px 8px 6px 0;color:var(--ink2);font-weight:600;border-bottom:1px solid var(--bg2);white-space:nowrap">'+pos+'</td>';
+    mx2+='<tr><td style="'+stk+'padding:6px 10px 6px 4px;color:var(--ink2);font-weight:600;border-bottom:1px solid var(--bg2);white-space:nowrap">'+pos+'</td>';
     LVS.forEach(lv=>{const s=mxStats[pos+'|'+lv]||{t:0,d:0};const t=s.t,d=s.d;
       const p=t>0?Math.round(d/t*100):0;const bg=p===100?'var(--good-bg)':p>0?'var(--blue-bg)':'transparent';const col=p===100?'var(--good)':p>0?'var(--blue)':'var(--ink4)';
-      mx2+=t>0?'<td style="padding:5px 3px;text-align:center;background:'+bg+';border-bottom:1px solid var(--bg2)"><span style="color:'+col+';font-weight:700">'+p+'%</span><br><span style="color:var(--ink4);font-size:9px">'+d+'/'+t+'</span></td>'
-        :'<td style="padding:5px 3px;text-align:center;color:var(--bg2);border-bottom:1px solid var(--bg2)">–</td>';});mx2+='</tr>';});
+      mx2+=t>0?'<td style="padding:5px 5px;text-align:center;background:'+bg+';border-bottom:1px solid var(--bg2);min-width:38px"><span style="color:'+col+';font-weight:700">'+p+'%</span><br><span style="color:var(--ink4);font-size:9px">'+d+'/'+t+'</span></td>'
+        :'<td style="padding:5px 5px;text-align:center;color:var(--bg2);border-bottom:1px solid var(--bg2);min-width:38px">–</td>';});mx2+='</tr>';});
   document.getElementById('d-mx').innerHTML=mx2+'</table>';
 }
 
