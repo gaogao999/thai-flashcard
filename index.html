@@ -3628,10 +3628,10 @@ svg{display:block}
 
 <script>
 // ── 定数 ──────────────────────────────────────────────
-const LVS=['A1','A2','B1','B2','C1','C2'];
-const LVN={A1:'5級',A2:'4級',B1:'3級',B2:'3級+',C1:'2級',C2:'1級'};
-const LVC={A1:'#C56A45',A2:'#B65C3A',B1:'#A8542F',B2:'#934B2B',C1:'#7E4427',C2:'#6B3B22'};
-const KT={A1:'タイ検5級',A2:'タイ検4級',B1:'タイ検3級',B2:'タイ検3級+',C1:'タイ検2級',C2:'タイ検1級'};
+const LVS=['A1','A2','B1','B2','B3','B4','C1','C2','C3','C4'];
+const LVN={A1:'5級',A2:'4級',B1:'3級',B2:'3級+',B3:'準2級',B4:'準2級+',C1:'2級',C2:'2級+',C3:'1級',C4:'1級+'};
+const LVC={A1:'#C56A45',A2:'#BC6038',B1:'#B0562F',B2:'#A44E2B',B3:'#984728',B4:'#8C4125',C1:'#803B22',C2:'#71351F',C3:'#62301C',C4:'#532A19'};
+const KT={A1:'タイ検5級',A2:'タイ検4級',B1:'タイ検3級',B2:'タイ検3級+',B3:'タイ検準2級',B4:'タイ検準2級+',C1:'タイ検2級',C2:'タイ検2級+',C3:'タイ検1級',C4:'タイ検1級+'};
 const POS=['名詞','動詞','形容詞','副詞','挨拶','代名詞','その他'];
 const STL=['苦手','うろ覚え','ほぼ覚えた','覚えた'];
 const STC={'苦手':'var(--bad)','うろ覚え':'var(--warn)','ほぼ覚えた':'var(--blue)','覚えた':'var(--good)'};
@@ -3685,7 +3685,7 @@ let _t0=Date.now();
 
 function save(){if(idbOK)idbSet('tap_raw',RAW).catch(()=>{});else ss('tap_raw',RAW);ss('tap_st',wSt);ss('tap_streak',strk);ss('tap_slog',slog);ss('tap_pref',pref);}
 // 同梱辞書の版。words.json更新時にこの数字を上げると既存利用者も最新版に更新される
-const SEED_VER=3;
+const SEED_VER=4;
 // 同梱の辞書(words.json 約1.8万語)を読み込む。?vでSWの古いキャッシュを回避。失敗時はnull
 async function loadSeed(){
   try{const res=await fetch('words.json?v='+SEED_VER,{cache:'no-store'});if(res.ok){const arr=await res.json();if(Array.isArray(arr)&&arr.length)return arr;}}catch{}
@@ -3886,8 +3886,8 @@ function computePosStats(){
   for(const w of RAW){const p=w.pos;if(!r[p])r[p]={tot:0,lnd:0};r[p].tot++;if(getSt(w.id)==='覚えた')r[p].lnd++;}
   return r;
 }
-const isBM=id=>pref.bm.includes(id);
-function togBM(id,el){if(isBM(id))pref.bm=pref.bm.filter(x=>x!==id);else pref.bm.push(id);save();el.textContent=isBM(id)?'⭐':'☆';}
+const isBM=id=>(pref.bm||(pref.bm=[])).includes(id);
+function togBM(id,el){if(!pref.bm)pref.bm=[];if(isBM(id))pref.bm=pref.bm.filter(x=>x!==id);else pref.bm.push(id);save();el.textContent=isBM(id)?'⭐':'☆';}
 
 // ── OB ────────────────────────────────────────────────
 const obD={};
@@ -4079,7 +4079,7 @@ function _start(wl,label,isCh){
 
 // ── 学習設定モーダル ──────────────────────────────────
 // ── ドラム式ピッカー ──────────────────────────────────
-const PK_LV  = [{v:'all',l:'全レベル'},{v:'A1',l:'5級'},{v:'A2',l:'4級'},{v:'B1',l:'3級'},{v:'B2',l:'3級+'},{v:'C1',l:'2級'},{v:'C2',l:'1級'}];
+const PK_LV  = [{v:'all',l:'全レベル'},{v:'A1',l:'5級'},{v:'A2',l:'4級'},{v:'B1',l:'3級'},{v:'B2',l:'3級+'},{v:'B3',l:'準2級'},{v:'B4',l:'準2級+'},{v:'C1',l:'2級'},{v:'C2',l:'2級+'},{v:'C3',l:'1級'},{v:'C4',l:'1級+'}];
 const PK_POS = [{v:'all',l:'全品詞'},{v:'名詞',l:'名詞'},{v:'動詞',l:'動詞'},{v:'形容詞',l:'形容詞'},{v:'副詞',l:'副詞'},{v:'挨拶',l:'挨拶'},{v:'代名詞',l:'代名詞'},{v:'その他',l:'その他'}];
 const PK_LIM = [{v:5,l:'5枚'},{v:10,l:'10枚'},{v:20,l:'20枚'}];
 
@@ -4206,7 +4206,7 @@ function loadCSV(e){
       const rows=parseCSV(txt);const hdr=rows[0];const im={};hdr.forEach((h,i)=>im[h.trim()]=i);
       const req=['id','thai','kana','roman','meaning','pos','score'];
       const miss=req.filter(k=>!(k in im));if(miss.length){csvSt('列なし: '+miss.join(', '),false);return;}
-      const gc=s=>{const n=parseInt(s);if(n>=32)return'A1';if(n>=29)return'A2';if(n>=26)return'B1';if(n>=23)return'B2';if(n>=17)return'C1';return'C2';};
+      const gc=s=>{const n=parseInt(s);if(n>=32)return'A1';if(n>=29)return'A2';if(n>=26)return'B1';if(n>=24)return'B2';if(n>=23)return'B3';if(n>=21)return'B4';if(n>=18)return'C1';if(n>=15)return'C2';if(n>=12)return'C3';return'C4';};
       // 複数意味は区切り(, ， 、)を「、」に統一して全て保持
       const norm=s=>(s||'').trim().replace(/\s*[,，]\s*/g,'、').replace(/、+/g,'、').replace(/^、+|、+$/g,'');
       const gx=(r,k)=>im[k]!=null&&r[im[k]]?r[im[k]]:'';// 列があり値があれば取得
