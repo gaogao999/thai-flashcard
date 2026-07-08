@@ -3628,21 +3628,15 @@ svg{display:block}
 
 <script>
 // ── 定数 ──────────────────────────────────────────────
-const LVS=['A1','A2','B1','B2','B3','B4','C1','C2','C3','C4'];
-const LVN={A1:'5級',A2:'4級',B1:'3級',B2:'3級+',B3:'準2級',B4:'準2級+',C1:'2級',C2:'2級+',C3:'1級',C4:'1級+'};
-const LVC={A1:'#C56A45',A2:'#BC6038',B1:'#B0562F',B2:'#A44E2B',B3:'#984728',B4:'#8C4125',C1:'#803B22',C2:'#71351F',C3:'#62301C',C4:'#532A19'};
-const KT={A1:'タイ検5級',A2:'タイ検4級',B1:'タイ検3級',B2:'タイ検3級+',B3:'タイ検準2級',B4:'タイ検準2級+',C1:'タイ検2級',C2:'タイ検2級+',C3:'タイ検1級',C4:'タイ検1級+'};
+const LVS=['A1','A2','B1','B2','C1','C2','C3'];
+const LVN={A1:'5級',A2:'4級',B1:'3級',B2:'準2級',C1:'2級',C2:'準1級',C3:'1級'};
+const LVC={A1:'#C56A45',A2:'#B65C3A',B1:'#A8542F',B2:'#96482A',C1:'#843F26',C2:'#6E341F',C3:'#5A2C1A'};
+const KT={A1:'タイ検5級',A2:'タイ検4級',B1:'タイ検3級',B2:'タイ検準2級',C1:'タイ検2級',C2:'タイ検準1級',C3:'タイ検1級'};
 const POS=['名詞','動詞','形容詞','副詞','挨拶','代名詞','その他'];
-// レベル割当: 5級/4級はスコア基準、3級以上(score<29)は件数で均等8分割（各級が同数になるように）
-function assignLevels(ws){
-  const sub=['B1','B2','B3','B4','C1','C2','C3','C4'];
-  ws.forEach(w=>{const n=parseInt(w.score);w.level=n>=32?'A1':(n>=29?'A2':'');});
-  const low=ws.filter(w=>!w.level);
-  low.sort((a,b)=>{const d=(parseInt(b.score)||0)-(parseInt(a.score)||0);return d||((parseInt(a.id)||0)-(parseInt(b.id)||0));});
-  const per=Math.ceil(low.length/8)||1;
-  low.forEach((w,i)=>{w.level=sub[Math.min(7,Math.floor(i/per))];});
-  return ws;
-}
+// レベル割当: スコア(難易度)をタイ検の級に対応（約3点刻み）
+// 5級:32+ / 4級:29-31 / 3級:26-28 / 準2級:23-25 / 2級:20-22 / 準1級:17-19 / 1級:16以下
+function scoreToLevel(sc){const n=parseInt(sc);return n>=32?'A1':n>=29?'A2':n>=26?'B1':n>=23?'B2':n>=20?'C1':n>=17?'C2':'C3';}
+function assignLevels(ws){ws.forEach(w=>{w.level=scoreToLevel(w.score);});return ws;}
 const STL=['苦手','うろ覚え','ほぼ覚えた','覚えた'];
 const STC={'苦手':'var(--bad)','うろ覚え':'var(--warn)','ほぼ覚えた':'var(--blue)','覚えた':'var(--good)'};
 const STB={'苦手':'var(--bad-bg)','うろ覚え':'var(--warn-bg)','ほぼ覚えた':'var(--blue-bg)','覚えた':'var(--good-bg)'};
@@ -3695,7 +3689,7 @@ let _t0=Date.now();
 
 function save(){if(idbOK)idbSet('tap_raw',RAW).catch(()=>{});else ss('tap_raw',RAW);ss('tap_st',wSt);ss('tap_streak',strk);ss('tap_slog',slog);ss('tap_pref',pref);}
 // 同梱辞書の版。words.json更新時にこの数字を上げると既存利用者も最新版に更新される
-const SEED_VER=5;
+const SEED_VER=6;
 // 同梱の辞書(words.json 約1.8万語)を読み込む。?vでSWの古いキャッシュを回避。失敗時はnull
 async function loadSeed(){
   try{const res=await fetch('words.json?v='+SEED_VER,{cache:'no-store'});if(res.ok){const arr=await res.json();if(Array.isArray(arr)&&arr.length)return arr;}}catch{}
@@ -4089,7 +4083,7 @@ function _start(wl,label,isCh){
 
 // ── 学習設定モーダル ──────────────────────────────────
 // ── ドラム式ピッカー ──────────────────────────────────
-const PK_LV  = [{v:'all',l:'全レベル'},{v:'A1',l:'5級'},{v:'A2',l:'4級'},{v:'B1',l:'3級'},{v:'B2',l:'3級+'},{v:'B3',l:'準2級'},{v:'B4',l:'準2級+'},{v:'C1',l:'2級'},{v:'C2',l:'2級+'},{v:'C3',l:'1級'},{v:'C4',l:'1級+'}];
+const PK_LV  = [{v:'all',l:'全レベル'},{v:'A1',l:'5級'},{v:'A2',l:'4級'},{v:'B1',l:'3級'},{v:'B2',l:'準2級'},{v:'C1',l:'2級'},{v:'C2',l:'準1級'},{v:'C3',l:'1級'}];
 const PK_POS = [{v:'all',l:'全品詞'},{v:'名詞',l:'名詞'},{v:'動詞',l:'動詞'},{v:'形容詞',l:'形容詞'},{v:'副詞',l:'副詞'},{v:'挨拶',l:'挨拶'},{v:'代名詞',l:'代名詞'},{v:'その他',l:'その他'}];
 const PK_LIM = [{v:5,l:'5枚'},{v:10,l:'10枚'},{v:20,l:'20枚'}];
 
