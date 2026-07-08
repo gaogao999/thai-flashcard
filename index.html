@@ -3633,6 +3633,16 @@ const LVN={A1:'5級',A2:'4級',B1:'3級',B2:'3級+',B3:'準2級',B4:'準2級+',C
 const LVC={A1:'#C56A45',A2:'#BC6038',B1:'#B0562F',B2:'#A44E2B',B3:'#984728',B4:'#8C4125',C1:'#803B22',C2:'#71351F',C3:'#62301C',C4:'#532A19'};
 const KT={A1:'タイ検5級',A2:'タイ検4級',B1:'タイ検3級',B2:'タイ検3級+',B3:'タイ検準2級',B4:'タイ検準2級+',C1:'タイ検2級',C2:'タイ検2級+',C3:'タイ検1級',C4:'タイ検1級+'};
 const POS=['名詞','動詞','形容詞','副詞','挨拶','代名詞','その他'];
+// レベル割当: 5級/4級はスコア基準、3級以上(score<29)は件数で均等8分割（各級が同数になるように）
+function assignLevels(ws){
+  const sub=['B1','B2','B3','B4','C1','C2','C3','C4'];
+  ws.forEach(w=>{const n=parseInt(w.score);w.level=n>=32?'A1':(n>=29?'A2':'');});
+  const low=ws.filter(w=>!w.level);
+  low.sort((a,b)=>{const d=(parseInt(b.score)||0)-(parseInt(a.score)||0);return d||((parseInt(a.id)||0)-(parseInt(b.id)||0));});
+  const per=Math.ceil(low.length/8)||1;
+  low.forEach((w,i)=>{w.level=sub[Math.min(7,Math.floor(i/per))];});
+  return ws;
+}
 const STL=['苦手','うろ覚え','ほぼ覚えた','覚えた'];
 const STC={'苦手':'var(--bad)','うろ覚え':'var(--warn)','ほぼ覚えた':'var(--blue)','覚えた':'var(--good)'};
 const STB={'苦手':'var(--bad-bg)','うろ覚え':'var(--warn-bg)','ほぼ覚えた':'var(--blue-bg)','覚えた':'var(--good-bg)'};
@@ -3685,7 +3695,7 @@ let _t0=Date.now();
 
 function save(){if(idbOK)idbSet('tap_raw',RAW).catch(()=>{});else ss('tap_raw',RAW);ss('tap_st',wSt);ss('tap_streak',strk);ss('tap_slog',slog);ss('tap_pref',pref);}
 // 同梱辞書の版。words.json更新時にこの数字を上げると既存利用者も最新版に更新される
-const SEED_VER=4;
+const SEED_VER=5;
 // 同梱の辞書(words.json 約1.8万語)を読み込む。?vでSWの古いキャッシュを回避。失敗時はnull
 async function loadSeed(){
   try{const res=await fetch('words.json?v='+SEED_VER,{cache:'no-store'});if(res.ok){const arr=await res.json();if(Array.isArray(arr)&&arr.length)return arr;}}catch{}
@@ -4206,13 +4216,12 @@ function loadCSV(e){
       const rows=parseCSV(txt);const hdr=rows[0];const im={};hdr.forEach((h,i)=>im[h.trim()]=i);
       const req=['id','thai','kana','roman','meaning','pos','score'];
       const miss=req.filter(k=>!(k in im));if(miss.length){csvSt('列なし: '+miss.join(', '),false);return;}
-      const gc=s=>{const n=parseInt(s);if(n>=32)return'A1';if(n>=29)return'A2';if(n>=26)return'B1';if(n>=24)return'B2';if(n>=23)return'B3';if(n>=21)return'B4';if(n>=18)return'C1';if(n>=15)return'C2';if(n>=12)return'C3';return'C4';};
       // 複数意味は区切り(, ， 、)を「、」に統一して全て保持
       const norm=s=>(s||'').trim().replace(/\s*[,，]\s*/g,'、').replace(/、+/g,'、').replace(/^、+|、+$/g,'');
       const gx=(r,k)=>im[k]!=null&&r[im[k]]?r[im[k]]:'';// 列があり値があれば取得
       const nw=rows.slice(1).map(r=>{const sc=parseInt(r[im.score])||0;
         const o={id:r[im.id],thai:r[im.thai],kana:im.kana!=null?r[im.kana]:'',roman:im.roman!=null?r[im.roman]:'',
-          meaning:norm(r[im.meaning]),pos:r[im.pos]||'その他',level:gc(sc),score:sc};
+          meaning:norm(r[im.meaning]),pos:r[im.pos]||'その他',level:'',score:sc};
         // 例文 ex1/ex2/ex3 を整形・復元し、有効なものだけを詰め直す
         const exs=[];
         ['ex1','ex2','ex3'].forEach(p=>{const fx=fixExample(gx(r,p+'_thai'),gx(r,p+'_kana'),gx(r,p+'_roman'),gx(r,p+'_meaning'),gx(r,p+'_thai_words'));if(fx)exs.push(fx);});
@@ -4220,6 +4229,7 @@ function loadCSV(e){
         return o;
       }).filter(w=>w.thai&&w.meaning);
       if(!nw.length){csvSt('単語なし',false);return;}
+      assignLevels(nw);// 3級以上を件数で均等分割
       RAW=nw;wSt={};save();document.getElementById('word-cnt').textContent=RAW.length;
       csvSt(''+RAW.length+'件 完了！',true);renderHome();
     }catch(err){csvSt(''+err.message,false);}
