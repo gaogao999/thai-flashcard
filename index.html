@@ -3215,6 +3215,13 @@ svg{display:block}
 .type-inp.ok{border-color:var(--good);background:var(--good-bg)}
 .type-inp.ng{border-color:var(--bad);background:var(--bad-bg)}
 .type-submit{width:100%;padding:16px;border:none;border-radius:14px;background:var(--accent);color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-top:10px}
+/* 不正解時の答え合わせパネル（タップするまで消えない） */
+.tp-ans{margin-top:12px;padding:14px 16px;border-radius:14px;background:var(--bad-bg);border:1.5px solid var(--bad);text-align:center}
+.tp-ans-l{font-size:11px;font-weight:700;color:var(--bad);letter-spacing:.04em}
+.tp-ans-you{font-size:13px;color:var(--ink3);margin-top:6px;text-decoration:line-through}
+.tp-ans-v{font-size:18px;font-weight:700;color:var(--ink);margin-top:8px;line-height:1.55;word-break:break-word}
+.tp-ans-sub{font-size:12.5px;color:var(--ink3);margin-top:6px}
+.tp-next{width:100%;padding:16px;border:none;border-radius:14px;background:var(--accent);color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-top:10px}
 .kana-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;justify-content:center}
 .kk{padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;background:var(--bg);font-size:14px;cursor:pointer;font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.06);transition:all .1s}
 .kk:active{background:var(--accent-light);border-color:var(--accent);transform:scale(.95)}
@@ -3463,7 +3470,8 @@ svg{display:block}
   <div class="type-area" id="type-area">
     <div class="type-q" id="tp-q"></div>
     <input class="type-inp" id="tp-inp" type="text" placeholder="日本語で意味を入力" autocomplete="off">
-    <button class="type-submit" onclick="checkType()">確認する</button>
+    <button class="type-submit" id="tp-submit" onclick="checkType()">確認する</button>
+    <div id="tp-res"></div>
   </div>
 </div>
 
@@ -4328,6 +4336,42 @@ const stripSp=s=>(s||'').replace(/[\s　・･]/g,'');
 // ローマ字照合用: 声調記号や発音記号を無視（「phrochanan」で「phrɔ́ chànán」に一致）
 const foldRoman=s=>(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase()
   .replace(/ɔ/g,'o').replace(/ɛ/g,'e').replace(/[ʉɯ]/g,'u').replace(/ŋ/g,'ng').replace(/ʔ/g,'').replace(/[\s　・･]/g,'');
+// ── タイプ入力の正誤判定 ────────────────────────────────
+// 「答える、返事をする、返答する」に対し「答える」だけでも正解にする
+const splitMeanings=s=>(s||'').split(/[、,，\/／;；]/).map(x=>x.trim()).filter(Boolean);
+// 日本語の照合用正規化（空白・波ダッシュ除去、ひらがな→カタカナ）
+const normJa=s=>toKata(stripSp((s||'').replace(/[〜～]/g,'')));
+// 注釈や括弧の表記ゆれを吸収した候補を返す（例:「角(つの)」→ 角 / つの / 角つの）
+function ansVariants(s){
+  const out=new Set();
+  const add=x=>{const t=normJa(x);if(t)out.add(t);};
+  // <色> [〜等で] のような注釈は除去
+  const base=(s||'').replace(/[<＜〈][^>＞〉]*[>＞〉]/g,'').replace(/[\[［][^\]］]*[\]］]/g,'').trim();
+  add(base);
+  add(base.replace(/[（(][^）)]*[）)]/g,''));// 角(つの) → 角
+  const m=base.match(/[（(]([^）)]*)[）)]/);
+  if(m)add(m[1]);                            // 角(つの) → つの
+  add(base.replace(/[（()）]/g,''));         // 角(つの) → 角つの
+  return [...out];
+}
+// 入力が正解かどうか（複数意味・送り仮名以外の表記ゆれを許容）
+function typeIsCorrect(w,ans,aT){
+  if(!ans||!ans.trim())return false;
+  if(aT){
+    const cands=new Set();
+    const feed=s=>ansVariants(s).forEach(v=>cands.add(v));
+    feed(w.meaning);splitMeanings(w.meaning).forEach(feed);// 全体でも個別の意味でもOK
+    if(w.kana){feed(w.kana);splitMeanings(w.kana).forEach(feed);}
+    // 入力側も同じ正規化を通す（「私[男性]」のように注釈ごと写した場合も拾う）
+    const mine=ansVariants(ans);
+    return mine.length>0&&mine.some(v=>cands.has(v));
+  }
+  const at=stripSp(ans);
+  if(at&&stripSp(w.thai)===at)return true;   // タイ文字そのまま
+  const ar=foldRoman(ans);if(!ar)return false;
+  // ローマ字は声調記号・発音記号を無視して照合
+  return foldRoman(w.roman)===ar||splitMeanings(w.roman).some(r=>foldRoman(r)===ar);
+}
 // 検索の関連度スコア（完全一致＞前方一致＞部分一致、短い語ほど上位。空白は無視）
 function dictScore(w,q){
   const qs=stripSp(q);if(!qs)return 0;
@@ -4726,9 +4770,11 @@ function showType(){
       +'<div class="word-meaning">'+esc(w.meaning)+'</div>'
       +'<div style="font-size:12px;color:var(--ink3);margin-top:10px">タイ語をローマ字で入力</div>';
   }
-  const inp=document.getElementById('tp-inp');inp.value='';inp.className='type-inp';
+  const inp=document.getElementById('tp-inp');inp.value='';inp.className='type-inp';inp.disabled=false;
   inp.placeholder=aT?'日本語で意味を入力':'タイ語をローマ字で入力';
   inp.onkeydown=e=>{if(e.key==='Enter')checkType();};
+  document.getElementById('tp-res').innerHTML='';// 前問の答え合わせを消す
+  document.getElementById('tp-submit').style.display='';
   requestAnimationFrame(()=>{fitWords(document.getElementById('tp-q'));fitFace(document.getElementById('tp-q'));});// タイ語1行・意味は枠内
   setTimeout(()=>inp.focus(),200);
 }
@@ -4736,13 +4782,22 @@ function checkType(){
   if(idx>=words.length)return;clearTimeout(tmrID);
   const w=words[idx],inp=document.getElementById('tp-inp');
   const ans=inp.value.trim();const aT=cfg.dir==='thai';
-  const nm=s=>s.replace(/[\s　]/g,'').toLowerCase();
-  const ok=aT?(nm(ans)===nm(w.meaning)||nm(ans)===nm(w.kana)):(nm(ans)===nm(w.thai)||nm(ans)===nm(w.roman));
+  const ok=typeIsCorrect(w,ans,aT);// 未入力は不正解扱い（＝答えを見て次へ進める）
   if(ok)playCorrect();else playWrong();
   inp.className='type-inp '+(ok?'ok':'ng');
-  if(!ok){inp.placeholder='正解: '+(aT?w.meaning:w.thai);inp.value='';}
   tpSt[ok?'c':'w']++;updSt(w,ok);recStrk();if(!ok)badWs.push(w);updRvBnr(['rv-bar-tp']);
-  setTimeout(()=>{advance();},ok?500:1200);
+  if(ok){setTimeout(()=>{advance();},500);return;}
+  // 不正解: 正解を出したまま、「次へ」をタップするまで進まない
+  inp.disabled=true;
+  document.getElementById('tp-submit').style.display='none';
+  const sub=aT?(showKana()&&w.kana?esc(w.kana):''):esc(w.roman||'');
+  document.getElementById('tp-res').innerHTML=
+    '<div class="tp-ans"><div class="tp-ans-l">正解</div>'
+    +(ans?'<div class="tp-ans-you">'+esc(ans)+'</div>':'')
+    +'<div class="tp-ans-v">'+esc(aT?w.meaning:w.thai)+'</div>'
+    +(sub?'<div class="tp-ans-sub">'+sub+'</div>':'')+'</div>'
+    +'<button class="tp-next" onclick="advance()">次へ →</button>';
+  speak(w.thai);
 }
 
 // ── 例文 ─────────────────────────────────────────────────
