@@ -4341,10 +4341,36 @@ const foldRoman=s=>(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase()
 const splitMeanings=s=>(s||'').split(/[、,，\/／;；]/).map(x=>x.trim()).filter(Boolean);
 // 日本語の照合用正規化（空白・波ダッシュ除去、ひらがな→カタカナ）
 const normJa=s=>toKata(stripSp((s||'').replace(/[〜～]/g,'')));
+// 語尾の揺れを落とした語幹（「好きである」→「好き」、「適切な」→「適切」、「愛する」→「愛」）
+// min = 落としたあとに残さなければいけない文字数（削りすぎて別語と衝突しないように）
+const JA_TAILS=[
+  {re:/である$/,min:1},{re:/です$/,min:1},{re:/だ$/,min:2},
+  {re:/をすること$/,min:1},{re:/すること$/,min:1},{re:/をする$/,min:1},{re:/する$/,min:1},
+  {re:/こと$/,min:2},{re:/[なの]$/,min:2},
+  {re:/([一-鿿])い$/,min:1,rep:'$1'}// 赤い→赤（「きれい」等のかな語尾は削らない）
+];
+function jaStems(s){
+  const out=[];let cur=s;
+  for(let i=0;i<4;i++){
+    let next=null;
+    for(const t of JA_TAILS){
+      if(!t.re.test(cur))continue;
+      const c=cur.replace(t.re,t.rep||'');
+      if(c.length>=t.min&&c!==cur){next=c;break;}
+    }
+    if(!next)break;
+    cur=next;out.push(cur);
+  }
+  return out;
+}
 // 注釈や括弧の表記ゆれを吸収した候補を返す（例:「角(つの)」→ 角 / つの / 角つの）
 function ansVariants(s){
   const out=new Set();
-  const add=x=>{const t=normJa(x);if(t)out.add(t);};
+  const add=x=>{
+    const raw=(x||'').replace(/[〜～]/g,'').trim();if(!raw)return;
+    const t=normJa(raw);if(t)out.add(t);
+    jaStems(raw).forEach(st=>{const v=normJa(st);if(v)out.add(v);});
+  };
   // <色> [〜等で] のような注釈は除去
   const base=(s||'').replace(/[<＜〈][^>＞〉]*[>＞〉]/g,'').replace(/[\[［][^\]］]*[\]］]/g,'').trim();
   add(base);
