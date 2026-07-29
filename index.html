@@ -3557,7 +3557,9 @@ svg{display:block}
         <button class="cfg-seg-btn" style="flex:1;padding:9px 4px;font-size:12px" onclick="setCfgSeg('mode','quiz',this)">4択</button>
         <button class="cfg-seg-btn" style="flex:1;padding:9px 4px;font-size:12px" onclick="setCfgSeg('mode','type',this)">タイプ</button>
         <button class="cfg-seg-btn" style="flex:1;padding:9px 4px;font-size:12px" onclick="setCfgSeg('mode','ex',this)">並替</button>
+        <button class="cfg-seg-btn" style="flex:1;padding:9px 4px;font-size:12px" onclick="setCfgSeg('mode','mix',this)">ミックス</button>
       </div>
+      <div id="mix-hint" style="display:none;font-size:11px;color:var(--ink3);margin-top:8px;line-height:1.5">4択・タイプ・並び替えを1問ごとにランダムで出題します</div>
     </div>
     <div class="cfg-row"><span class="cfg-label">出題方向</span>
       <div class="cfg-seg" id="seg-dir">
@@ -4070,7 +4072,6 @@ function _start(wl,label,isCh){
   document.getElementById('hdr-cfg').style.display='none';
   document.getElementById('bnav').style.display='none'; // 学習中はナビ非表示（mikan方式）
   const mode=cfg.mode;
-  showScr(mode==='flip'?'flip':mode==='quiz'?'quiz':mode==='type'?'type':'ex');
   const label2=label+' ・ '+wl.length+'枚';
   ['flip','quiz','type','ex'].forEach(m=>{const el=document.getElementById(m+'-prog');if(el)el.textContent='1 / '+wl.length;});
   document.getElementById('flip-bar').style.width='0%';
@@ -4078,11 +4079,35 @@ function _start(wl,label,isCh){
   document.getElementById('tp-bar').style.width='0%';
   document.getElementById('ex-bar').style.width='0%';
   ['flip','quiz','type','ex'].forEach(m=>{const el=document.getElementById('rv-bar-'+m);if(el)el.style.display='none';});
-  if(mode==='flip')showCard();
-  else if(mode==='quiz')showQz();
-  else if(mode==='type')showType();
+  renderStudy();
+}
+// ── 出題ディスパッチ（ミックス対応）───────────────────────
+// ミックス時に前問と同じモードが連続しないよう記録
+let mixLast=null;
+// 現在の単語に対して出題モードを決める（ミックスなら1問ごとにランダム）
+function pickMode(){
+  if(cfg.mode!=='mix')return cfg.mode;
+  const w=words[idx];
+  let opts=['quiz','type'];
+  if(w&&w.ex1_thai_words&&w.ex1_thai_words.includes('|'))opts.push('ex');
+  // 直前と同じモードは避ける（候補が2つ以上ある場合）
+  if(opts.length>1&&mixLast&&opts.includes(mixLast)){
+    const f=opts.filter(m=>m!==mixLast);if(f.length)opts=f;
+  }
+  return opts[Math.floor(Math.random()*opts.length)];
+}
+// 現在の単語を、決めたモードの画面で描画する
+function renderStudy(){
+  if(idx>=words.length){showResult();return;}
+  const m=pickMode();mixLast=m;
+  showScr(m==='flip'?'flip':m==='quiz'?'quiz':m==='type'?'type':'ex');
+  if(m==='flip')showCard();
+  else if(m==='quiz')showQz();
+  else if(m==='type')showType();
   else showEx();
 }
+// 次の単語へ（各モードの「次へ」から呼ぶ）
+function advance(){idx++;renderStudy();}
 
 // ── 学習設定モーダル ──────────────────────────────────
 // ── ドラム式ピッカー ──────────────────────────────────
@@ -4138,14 +4163,15 @@ function openCfg(){
   document.getElementById('cfg-ov').classList.add('open');
   document.body.style.overflow='hidden'; // 背景スクロール防止
   // セグメントを前回値に同期
-  syncSeg('seg-mode','mode');syncSeg('seg-dir','dir');syncSeg('seg-scope','scope');syncSeg('seg-order','order');
+  syncSeg('seg-mode','mode');syncSeg('seg-dir','dir');syncSeg('seg-scope','scope');syncSeg('seg-order','order');updMixHint();
   // ピッカー初期化（前回値で初期化）
   initPicker('pk-lv',  PK_LV,  cfg.lv,    v => { cfg.lv  = v; saveCfg(); });
   initPicker('pk-pos', PK_POS, cfg.pos,   v => { cfg.pos = v; saveCfg(); });
   initPicker('pk-lim', PK_LIM, cfg.limit, v => { cfg.limit = parseInt(v); saveCfg(); });
 }
 function closeCfgOv(e){if(e.target.id==='cfg-ov'){document.getElementById('cfg-ov').classList.remove('open');document.body.style.overflow='';}}
-function setCfgSeg(key,val,btn){cfg[key]=val;btn.closest('.cfg-seg').querySelectorAll('.cfg-seg-btn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');saveCfg();}
+function setCfgSeg(key,val,btn){cfg[key]=val;btn.closest('.cfg-seg').querySelectorAll('.cfg-seg-btn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');if(key==='mode')updMixHint();saveCfg();}
+function updMixHint(){const h=document.getElementById('mix-hint');if(h)h.style.display=cfg.mode==='mix'?'block':'none';}
 
 
 
@@ -4627,7 +4653,7 @@ function armQzNext(od,ct){
     if(sp&&sp.textContent===ct){
       b.classList.add('quiz-opt-next');
       b.style.pointerEvents='auto';b.style.cursor='pointer';
-      b.onclick=()=>{clearTimeout(tmrID);idx++;showQz();};
+      b.onclick=()=>{clearTimeout(tmrID);advance();};
     }
   });
   const dk=document.getElementById('qz-dk');
@@ -4663,7 +4689,7 @@ function showQz(){
         Array.from(od.children).forEach(b=>{const sp=b.querySelector('span');if(sp&&sp.textContent===ct){b.style.background='var(--good-bg)';b.querySelector('.quiz-opt-num').style.background='var(--good)';b.querySelector('.quiz-opt-num').style.color='#fff';}});}
       qSt[ok?'c':'w']++;updSt(w,ok);recStrk();if(!ok)badWs.push(w);updRvBnr(['rv-bar-qz']);
       clearTimeout(tmrID);
-      if(ok){setTimeout(()=>{idx++;showQz();},700);}
+      if(ok){setTimeout(()=>{advance();},700);}
       else{armQzNext(od,ct);}};// 不正解時は正解をタップするまで進まない
     od.appendChild(btn);});
   requestAnimationFrame(()=>{fitWords(document.getElementById('qz-q'));fitFace(document.getElementById('qz-q'));});// タイ語1行・意味は枠内
@@ -4716,7 +4742,7 @@ function checkType(){
   inp.className='type-inp '+(ok?'ok':'ng');
   if(!ok){inp.placeholder='正解: '+(aT?w.meaning:w.thai);inp.value='';}
   tpSt[ok?'c':'w']++;updSt(w,ok);recStrk();if(!ok)badWs.push(w);updRvBnr(['rv-bar-tp']);
-  setTimeout(()=>{idx++;showType();},ok?500:1200);
+  setTimeout(()=>{advance();},ok?500:1200);
 }
 
 // ── 例文 ─────────────────────────────────────────────────
@@ -4819,7 +4845,7 @@ function arrCheck(){
   document.getElementById('arr-actions').style.display='none';
   setTimeout(()=>{
     window._arrShuffled=null;
-    idx++;showEx();
+    advance();
   },ok?1100:2200);
 }
 
