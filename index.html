@@ -4754,6 +4754,16 @@ function quizDontKnow(){
 }
 
 // ── タイピング ────────────────────────────────────────────
+let tpAns=false;          // この問題を判定済みか（二重送信で1問飛ぶのを防ぐ）
+let tpComposing=false;    // 日本語入力の変換中か
+let tpCompEnd=0;          // 変換確定した時刻
+let tpCompBound=false;
+// compositionstart/end は on〜 代入では拾えないので addEventListener で1度だけ登録
+function bindTpComp(inp){
+  if(tpCompBound||!inp)return;tpCompBound=true;
+  inp.addEventListener('compositionstart',()=>{tpComposing=true;});
+  inp.addEventListener('compositionend',()=>{tpComposing=false;tpCompEnd=Date.now();});
+}
 function showType(){
   if(idx>=words.length){showResult();return;}
   const w=words[idx];
@@ -4772,14 +4782,22 @@ function showType(){
   }
   const inp=document.getElementById('tp-inp');inp.value='';inp.className='type-inp';inp.disabled=false;
   inp.placeholder=aT?'日本語で意味を入力':'タイ語をローマ字で入力';
-  inp.onkeydown=e=>{if(e.key==='Enter')checkType();};
+  tpAns=false;tpComposing=false;tpCompEnd=0;
+  bindTpComp(inp);// 日本語入力の変換確定Enterで送信されないようにする
+  inp.onkeydown=e=>{
+    if(e.key!=='Enter')return;
+    if(tpComposing||e.isComposing||e.keyCode===229)return;// 変換中の確定Enterは無視
+    if(Date.now()-tpCompEnd<250)return;                   // 確定直後に続けて届くEnterも無視
+    checkType();
+  };
   document.getElementById('tp-res').innerHTML='';// 前問の答え合わせを消す
   document.getElementById('tp-submit').style.display='';
   requestAnimationFrame(()=>{fitWords(document.getElementById('tp-q'));fitFace(document.getElementById('tp-q'));});// タイ語1行・意味は枠内
   setTimeout(()=>inp.focus(),200);
 }
 function checkType(){
-  if(idx>=words.length)return;clearTimeout(tmrID);
+  if(idx>=words.length||tpAns)return;// 判定済みなら何もしない（連打で飛ばさない）
+  tpAns=true;clearTimeout(tmrID);
   const w=words[idx],inp=document.getElementById('tp-inp');
   const ans=inp.value.trim();const aT=cfg.dir==='thai';
   const ok=typeIsCorrect(w,ans,aT);// 未入力は不正解扱い（＝答えを見て次へ進める）
