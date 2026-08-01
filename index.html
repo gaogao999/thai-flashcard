@@ -3785,7 +3785,17 @@ function pickDistractors(w, pool3){
 }
 
 const shuf=a=>{const b=[...a];for(let i=b.length-1;i>0;i--){const j=0|Math.random()*(i+1);[b[i],b[j]]=[b[j],b[i]];}return b;};
-function speak(t){if(!window.speechSynthesis)return;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='th-TH';u.rate=.85;const v=speechSynthesis.getVoices().find(x=>x.lang==='th-TH'||x.lang==='th');if(v)u.voice=v;speechSynthesis.speak(u);}
+// onEnd を渡すと読み上げ終了時に呼ばれる（音声が使えない環境では即座に呼ぶ）
+function speak(t,onEnd){
+  const fin=(()=>{let done=false;return()=>{if(done)return;done=true;if(onEnd)onEnd();};})();
+  if(!window.speechSynthesis||!t){fin();return;}
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(t);u.lang='th-TH';u.rate=.85;
+  const v=speechSynthesis.getVoices().find(x=>x.lang==='th-TH'||x.lang==='th');if(v)u.voice=v;
+  u.onend=fin;u.onerror=fin;
+  speechSynthesis.speak(u);
+}
+function stopSpeak(){if(window.speechSynthesis)speechSynthesis.cancel();}
 // ── 効果音（WAVを合成しHTMLAudioで再生：iOSでWeb Audioより鳴りやすい）──
 const _SR=22050;
 function _synthWav(notes,dur){// notes:[{f,start,len,gain,type}]
@@ -3920,7 +3930,7 @@ function showScr(id){ALL_SCRS.forEach(s=>{const el=document.getElementById('scr-
 const STUDY_SCRS=['flip','quiz','type','ex','result'];
 
 function switchTab(t){
-  saveSec();curTab=t;
+  saveSec();stopSpeak();curTab=t;
   document.getElementById('hdr').style.display='';// メインヘッダーを表示に戻す
   ['home','study','dict','dash','settings'].forEach(x=>document.getElementById('nav-'+x)?.classList.toggle('active',x===t));
   showScr(t);
@@ -3932,6 +3942,7 @@ function switchTab(t){
   if(t==='home')renderHome();if(t==='dict')renderDict();if(t==='dash')renderDash();if(t==='settings')renderSettings();
 }
 function headerBack(){
+  stopSpeak();// 学習を抜けたら読み上げも止める
   if(fromCh){goChapters(curLv);fromCh=false;return;}
   if(document.getElementById('scr-ch').style.display==='flex'){switchTab('home');return;}
   switchTab('home');
@@ -4939,13 +4950,20 @@ function arrCheck(){
   }
   // 習熟度更新
   qSt[ok?'c':'w']++;updSt(w,ok);recStrk();if(!ok)badWs.push(w);
-  speak(w.ex1_thai);
-  // アクションボタンを「次へ」に
   document.getElementById('arr-actions').style.display='none';
-  setTimeout(()=>{
-    window._arrShuffled=null;
-    advance();
-  },ok?1100:2200);
+  // 例文の読み上げが終わってから次へ進む（結果を読む時間も確保）
+  const minMs=ok?1100:2200;      // 最低これだけは結果を表示する
+  const capMs=20000;             // 読み上げが終わらない場合の保険
+  const t0=Date.now();const myIdx=idx;
+  let moved=false,capID=null;
+  const go=()=>{
+    if(moved)return;moved=true;clearTimeout(capID);
+    // 待っている間に学習を抜けた／別の問題に移った場合は進めない
+    if(idx!==myIdx||document.getElementById('scr-ex').style.display==='none')return;
+    window._arrShuffled=null;advance();
+  };
+  capID=setTimeout(go,capMs);
+  speak(w.ex1_thai,()=>setTimeout(go,Math.max(400,minMs-(Date.now()-t0))));
 }
 
 // ── 結果 ─────────────────────────────────────────────────
