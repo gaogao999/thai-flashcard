@@ -3218,6 +3218,8 @@ svg{display:block}
 /* 不正解時の答え合わせパネル（タップするまで消えない） */
 .tp-ans{margin-top:12px;padding:14px 16px;border-radius:14px;background:var(--bad-bg);border:1.5px solid var(--bad);text-align:center}
 .tp-ans-l{font-size:11px;font-weight:700;color:var(--bad);letter-spacing:.04em}
+.tp-ans.ok{background:var(--good-bg);border-color:var(--good)}
+.tp-ans.ok .tp-ans-l{color:var(--good)}
 .tp-ans-you{font-size:13px;color:var(--ink3);margin-top:6px;text-decoration:line-through}
 .tp-ans-v{font-size:18px;font-weight:700;color:var(--ink);margin-top:8px;line-height:1.55;word-break:break-word}
 .tp-ans-sub{font-size:12.5px;color:var(--ink3);margin-top:6px}
@@ -4859,18 +4861,17 @@ function checkType(){
   if(ok)playCorrect();else playWrong();
   inp.className='type-inp '+(ok?'ok':'ng');
   tpSt[ok?'c':'w']++;updSt(w,ok);recStrk();if(!ok)badWs.push(w);updRvBnr(['rv-bar-tp']);
-  if(ok){setTimeout(()=>{advance();},500);return;}
-  // 不正解: 正解を出したまま、「次へ」をタップするまで進まない
+  // 正解・不正解どちらも答えを出す（意味が複数ある単語は他の意味も確認できる）
   inp.disabled=true;
   document.getElementById('tp-submit').style.display='none';
   const sub=aT?(showKana()&&w.kana?esc(w.kana):''):esc(w.roman||'');
   document.getElementById('tp-res').innerHTML=
-    '<div class="tp-ans"><div class="tp-ans-l">正解</div>'
-    +(ans?'<div class="tp-ans-you">'+esc(ans)+'</div>':'')
+    '<div class="tp-ans'+(ok?' ok':'')+'"><div class="tp-ans-l">'+(ok?'正解！':'正解')+'</div>'
+    +(!ok&&ans?'<div class="tp-ans-you">'+esc(ans)+'</div>':'')
     +'<div class="tp-ans-v">'+esc(aT?w.meaning:w.thai)+'</div>'
     +(sub?'<div class="tp-ans-sub">'+sub+'</div>':'')+'</div>'
     +'<button class="tp-next" onclick="advance()">次へ →</button>';
-  speak(w.thai);
+  if(!ok)speak(w.thai);// 不正解のときだけ読み直す（正解時は効果音と重ならないように）
 }
 
 // ── 例文 ─────────────────────────────────────────────────
