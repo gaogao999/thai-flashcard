@@ -3769,12 +3769,19 @@ function pickDistractors(w, pool3){
 
   const chosen = [];
   const usedIds = new Set([w.id]);
+  // 表示が正解と同じ選択肢を作らない（「ありがとう」= ขอบคุณ / ขอบใจ のように
+  // 別単語でも意味の文字列が同一のものがあり、選択肢が重複すると正解を選べなくなる）
+  const usedTx = new Set([w.meaning, w.thai]);
 
+  // 取り出すたびに判定する（事前に絞ると同じ呼び出し内で重複を拾ってしまう）
   function pick(src, n){
-    const candidates = shuf(src.filter(x => !usedIds.has(x.id)));
-    const take = candidates.slice(0, n);
-    take.forEach(x => { chosen.push(x); usedIds.add(x.id); });
-    return take.length;
+    let took = 0;
+    for(const x of shuf(src)){
+      if(took >= n) break;
+      if(usedIds.has(x.id) || usedTx.has(x.meaning) || usedTx.has(x.thai)) continue;
+      chosen.push(x); usedIds.add(x.id); usedTx.add(x.meaning); usedTx.add(x.thai); took++;
+    }
+    return took;
   }
 
   // まず優先度1から埋める
@@ -4364,8 +4371,13 @@ const JA_ORTH=[
   ['程','ほど'],['事','こと'],['物','もの'],['時','とき'],['為','ため'],['所','ところ'],['達','たち']
 ];
 const foldOrth=s=>{let t=s||'';for(const p of JA_ORTH)t=t.split(p[0]).join(p[1]);return t;};
-// 日本語の照合用正規化（空白・波ダッシュ除去、表記ゆれ吸収、ひらがな→カタカナ）
-const normJa=s=>toKata(stripSp(foldOrth((s||'').replace(/[〜～]/g,''))));
+// 日本語の照合用正規化
+// NFKCで全角英数を半角に揃え（「１」＝「1」「Ｓ」＝「S」）、記号・鉤括弧・波ダッシュを除去し、
+// 表記ゆれを吸収してカタカナに寄せる
+const normJa=s=>toKata(stripSp(foldOrth(String(s||'').normalize('NFKC')
+  .replace(/[〜～~]/g,'')
+  .replace(/[「」『』"'”“’‘]/g,'')
+  .replace(/[?？!！。．.]/g,''))));
 // 語尾の揺れを落とした語幹（「好きである」→「好き」、「適切な」→「適切」、「愛する」→「愛」）
 // min = 落としたあとに残さなければいけない文字数（削りすぎて別語と衝突しないように）
 // 長い語尾から先に並べること（「がする」を「する」より先に見る必要がある）
@@ -4397,6 +4409,8 @@ function jaStems(s){
   }
   return out;
 }
+const NUM_KANJI={'一':'1','二':'2','三':'3','四':'4','五':'5','六':'6','七':'7','八':'8','九':'9',
+  '十':'10','百':'100','千':'1000','万':'10000','零':'0'};
 // 注釈や括弧の表記ゆれを吸収した候補を返す（例:「角(つの)」→ 角 / つの / 角つの）
 function ansVariants(s){
   const out=new Set();
@@ -4412,6 +4426,11 @@ function ansVariants(s){
   const m=base.match(/[（(]([^）)]*)[）)]/);
   if(m)add(m[1]);                            // 角(つの) → つの
   add(base.replace(/[（()）]/g,''));         // 角(つの) → 角つの
+  // 数字は漢数字でも算用数字でも通す（「１」＝「一」）。
+  // 単独の数字のときだけ変換する（「十分」が「10分」にならないように）
+  const numOnly=base.replace(/[<＜〈][^>＞〉]*[>＞〉]/g,'').normalize('NFKC').trim();
+  if(NUM_KANJI[numOnly])add(NUM_KANJI[numOnly]);
+  for(const k in NUM_KANJI)if(NUM_KANJI[k]===numOnly)add(k);
   // 先頭の「〜を」「〜に」などの穴埋め部分を外した形も候補にする
   // （「〜をし始める」→「始める」、「〜に戻る」→「戻る」）
   const lead=base.replace(/^[〜～]\s*(?:から|より|を|に|が|と|へ|で|の)?\s*/,'');
@@ -4443,21 +4462,31 @@ function typeIsCorrect(w,ans,aT){
 // 検索の関連度スコア（完全一致＞前方一致＞部分一致、短い語ほど上位。空白は無視）
 function dictScore(w,q){
   const qs=stripSp(q);if(!qs)return 0;
-  const qk=toKata(qs);
+  const qk=normJa(q);// 日本語・カナ側の照合キー
   let s=0;
   const th=stripSp(w.thai);
   if(th===qs)s=Math.max(s,1000);
   else if(th.startsWith(qs))s=Math.max(s,900-Math.min(th.length,80));
   else if(th.includes(qs))s=Math.max(s,700-Math.min(th.length,80));
-  const mnRaw=w.meaning||'',mn=stripSp(mnRaw);
-  if(mn===qs)s=Math.max(s,820);
-  else if(mnRaw.split('、').some(x=>stripSp(x)===qs))s=Math.max(s,680);// 複数意味のうちの一つに完全一致
-  else if(mn.startsWith(qs))s=Math.max(s,600);
-  else if(mn.includes(qs))s=Math.max(s,500);
-  const ka=toKata(stripSp(w.kana));
-  if(ka===qk)s=Math.max(s,800);
-  else if(ka.startsWith(qk))s=Math.max(s,640-Math.min(ka.length,80));
-  else if(ka.includes(qk))s=Math.max(s,480);
+  // 日本語は全角/半角・記号・表記ゆれを吸収して照合（「1」で「１<数字>」も見つかる）
+  const mnRaw=w.meaning||'',mn=normJa(mnRaw);
+  // 漢数字と算用数字は相互に引ける（「一」でも「１<数字>」が見つかる）
+  const qAlt=NUM_KANJI[qk]||Object.keys(NUM_KANJI).find(k=>NUM_KANJI[k]===qk)||'';
+  // 「１<数字>」の注釈を外した形も完全一致の対象にする
+  const mnParts=mnRaw.split('、').map(x=>normJa(x.replace(/[<＜〈][^>＞〉]*[>＞〉]/g,'').replace(/[\[［][^\]］]*[\]］]/g,'')));
+  [qk,qAlt].forEach(k=>{
+    if(!k)return;
+    if(mn===k)s=Math.max(s,820);
+    else if(mnParts.some(x=>x===k))s=Math.max(s,680);// 複数意味のうちの一つに完全一致
+    else if(mn.startsWith(k))s=Math.max(s,600);
+    else if(mn.includes(k))s=Math.max(s,500);
+  });
+  const ka=normJa(w.kana);
+  if(qk&&ka){
+    if(ka===qk)s=Math.max(s,800);
+    else if(ka.startsWith(qk))s=Math.max(s,640-Math.min(ka.length,80));
+    else if(ka.includes(qk))s=Math.max(s,480);
+  }
   const rm=foldRoman(w.roman),qr=foldRoman(q);
   if(qr){
     if(rm===qr)s=Math.max(s,780);
