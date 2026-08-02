@@ -3224,6 +3224,9 @@ svg{display:block}
 .tp-ans-v{font-size:18px;font-weight:700;color:var(--ink);margin-top:8px;line-height:1.55;word-break:break-word}
 .tp-ans-sub{font-size:12.5px;color:var(--ink3);margin-top:6px}
 .tp-next{width:100%;padding:16px;border:none;border-radius:14px;background:var(--accent);color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-top:10px}
+/* 言い換えを自分で正解に訂正するボタン */
+.tp-ok-btn{width:100%;padding:13px;border:1.5px solid var(--good);border-radius:14px;background:transparent;color:var(--good);font-size:14px;font-weight:700;cursor:pointer;margin-top:10px}
+.tp-ans-you.kept{text-decoration:none;color:var(--good)}
 .kana-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;justify-content:center}
 .kk{padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;background:var(--bg);font-size:14px;cursor:pointer;font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.06);transition:all .1s}
 .kk:active{background:var(--accent-light);border-color:var(--accent);transform:scale(.95)}
@@ -4812,6 +4815,8 @@ function quizDontKnow(){
 
 // ── タイピング ────────────────────────────────────────────
 let tpAns=false;          // この問題を判定済みか（二重送信で1問飛ぶのを防ぐ）
+let tpOvr=false;          // 「やっぱり正解」で訂正済みか
+let tpPrevSt=null;        // 判定前の習熟度（訂正時に戻す）
 let tpComposing=false;    // 日本語入力の変換中か
 let tpCompEnd=0;          // 変換確定した時刻
 let tpCompBound=false;
@@ -4839,7 +4844,7 @@ function showType(){
   }
   const inp=document.getElementById('tp-inp');inp.value='';inp.className='type-inp';inp.disabled=false;
   inp.placeholder=aT?'日本語で意味を入力':'タイ語をローマ字で入力';
-  tpAns=false;tpComposing=false;tpCompEnd=0;
+  tpAns=false;tpOvr=false;tpPrevSt=null;tpComposing=false;tpCompEnd=0;
   bindTpComp(inp);// 日本語入力の変換確定Enterで送信されないようにする
   inp.onkeydown=e=>{
     if(e.key!=='Enter')return;
@@ -4858,20 +4863,45 @@ function checkType(){
   const w=words[idx],inp=document.getElementById('tp-inp');
   const ans=inp.value.trim();const aT=cfg.dir==='thai';
   const ok=typeIsCorrect(w,ans,aT);// 未入力は不正解扱い（＝答えを見て次へ進める）
+  tpPrevSt=wSt[w.id]?{status:wSt[w.id].status,n:wSt[w.id].n}:null;// 「やっぱり正解」で戻せるように控える
   if(ok)playCorrect();else playWrong();
   inp.className='type-inp '+(ok?'ok':'ng');
   tpSt[ok?'c':'w']++;updSt(w,ok);recStrk();if(!ok)badWs.push(w);updRvBnr(['rv-bar-tp']);
   // 正解・不正解どちらも答えを出す（意味が複数ある単語は他の意味も確認できる）
   inp.disabled=true;
   document.getElementById('tp-submit').style.display='none';
+  tpRenderAns(w,ok,ans,aT,false);
+  if(!ok)speak(w.thai);// 不正解のときだけ読み直す（正解時は効果音と重ならないように）
+}
+// 答え合わせパネル。ovr=「やっぱり正解」で訂正した場合
+function tpRenderAns(w,ok,ans,aT,ovr){
   const sub=aT?(showKana()&&w.kana?esc(w.kana):''):esc(w.roman||'');
   document.getElementById('tp-res').innerHTML=
-    '<div class="tp-ans'+(ok?' ok':'')+'"><div class="tp-ans-l">'+(ok?'正解！':'正解')+'</div>'
-    +(!ok&&ans?'<div class="tp-ans-you">'+esc(ans)+'</div>':'')
+    '<div class="tp-ans'+(ok?' ok':'')+'">'
+    +'<div class="tp-ans-l">'+(ok?(ovr?'正解にしました':'正解！'):'正解')+'</div>'
+    // 自分の解答は「不正解（消し線）」と「訂正した（緑）」のときだけ出す
+    +(ans&&(!ok||ovr)?'<div class="tp-ans-you'+(ovr?' kept':'')+'">'+esc(ans)+'</div>':'')
     +'<div class="tp-ans-v">'+esc(aT?w.meaning:w.thai)+'</div>'
     +(sub?'<div class="tp-ans-sub">'+sub+'</div>':'')+'</div>'
+    // 「右折」＝「右に曲がる」のような言い換えは自動判定できないので自分で訂正できるようにする
+    +(!ok&&ans?'<button class="tp-ok-btn" onclick="typeMarkCorrect()">やっぱり正解にする</button>':'')
     +'<button class="tp-next" onclick="advance()">次へ →</button>';
-  if(!ok)speak(w.thai);// 不正解のときだけ読み直す（正解時は効果音と重ならないように）
+}
+// 不正解の判定を取り消して正解にする
+function typeMarkCorrect(){
+  if(idx>=words.length||!tpAns||tpOvr)return;
+  tpOvr=true;
+  const w=words[idx];const aT=cfg.dir==='thai';
+  const ans=document.getElementById('tp-inp').value.trim();
+  // 判定前の習熟度に戻してから、正解として付け直す
+  if(tpPrevSt)wSt[w.id]=tpPrevSt;else delete wSt[w.id];
+  tpPrevSt=null;
+  tpSt.w=Math.max(0,tpSt.w-1);tpSt.c++;
+  const i=badWs.lastIndexOf(w);if(i>=0)badWs.splice(i,1);
+  updSt(w,true);updRvBnr(['rv-bar-tp']);
+  stopSpeak();playCorrect();
+  document.getElementById('tp-inp').className='type-inp ok';
+  tpRenderAns(w,true,ans,aT,true);
 }
 
 // ── 例文 ─────────────────────────────────────────────────
