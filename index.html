@@ -4412,6 +4412,14 @@ function ansVariants(s){
   const m=base.match(/[（(]([^）)]*)[）)]/);
   if(m)add(m[1]);                            // 角(つの) → つの
   add(base.replace(/[（()）]/g,''));         // 角(つの) → 角つの
+  // 先頭の「〜を」「〜に」などの穴埋め部分を外した形も候補にする
+  // （「〜をし始める」→「始める」、「〜に戻る」→「戻る」）
+  const lead=base.replace(/^[〜～]\s*(?:から|より|を|に|が|と|へ|で|の)?\s*/,'');
+  if(lead&&lead!==base){
+    add(lead);                       // 〜をし始める → し始める
+    const lead2=lead.replace(/^し/,'');
+    if(lead2&&lead2!==lead)add(lead2);// し始める → 始める
+  }
   return [...out];
 }
 // 入力が正解かどうか（複数意味・送り仮名以外の表記ゆれを許容）
