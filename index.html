@@ -3916,7 +3916,7 @@ function updSt(w,ok,kind,weak){
   if(nM==null)nM=(cur.n!=null)?cur.n:inferN(before,T);// 旧データからの引き継ぎ
   if(nF==null)nF=0;
   if(ok&&weak){
-    wSt[w.id]=Object.assign({},cur,{status:stFromN(nM,T),nM:nM,nF:nF,g2:true,
+    wSt[w.id]=Object.assign({},cur,{status:stFromN(Math.max(nM,nF),T),nM:nM,nF:nF,g2:true,
       ivl:1,ease:cur.ease||2.3,last:Date.now(),due:Date.now()+DAY});
     recWord(w.id);save();return;
   }
@@ -3936,7 +3936,9 @@ function updSt(w,ok,kind,weak){
   }else{
     ivl=1;ease=Math.max(1.3,ease-0.25);
   }
-  const after=stFromN(nM,T);
+  // 方向を固定すると片方の数しか増えないので、進んでいるほうで表示する。
+  // 自動では意味→綴りの順に増えるため max は実質 nM と同じ
+  const after=stFromN(Math.max(nM,nF),T);
   const newlyMastered=after===STL[3]&&before!==STL[3];// 新たに「覚えた」に到達
   if(newlyMastered)slog.todayLnd=(slog.todayLnd||0)+1;// 今日覚えた数をカウント
   wSt[w.id]={status:after,nM:nM,nF:nF,ivl:ivl,ease:ease,g2:ok?!!cur.g2:false,// 誤答で通過印は落とす
@@ -3970,7 +3972,7 @@ function migrateSched(){
 // 閾値変更時に全単語の状態を再計算
 function recomputeAllSt(){
   const T=masterT();
-  for(const id in wSt){const s=wSt[id];let n=s.nM;if(n==null)n=(s.n!=null)?s.n:inferN(s.status,T);s.nM=n;s.status=stFromN(n,T);}
+  for(const id in wSt){const s=wSt[id];let n=s.nM;if(n==null)n=(s.n!=null)?s.n:inferN(s.status,T);s.nM=n;s.status=stFromN(Math.max(n,s.nF||0),T);}
 }
 let _toastTimer=null;
 function showLevelUpToast(){
@@ -4238,7 +4240,8 @@ function planFor(w){
   const s=(w&&wSt[w.id])||{},T=masterT();
   const nM=s.nM||0,nF=s.nF||0;
   const hasEx=!!(w&&w.ex1_thai_words&&w.ex1_thai_words.includes('|'));
-  const aT=autoDir(w);
+  // 実際に画面で使う方向と同じものを見る（利用者が方向を固定していればそれに従う）
+  const aT=askThai(w);
   let p;
   if(!s.last)     p={fmt:'quiz',aT:aT,opts:4};// 初出：4択
   else if(nM===0) p={fmt:'quiz',aT:aT,opts:s.g2?4:2};// 直前に誤答：まず2択、通過したら4択で確かめる
@@ -4399,7 +4402,7 @@ function mixSeq(rev,add){
 // セッションを組む。復習を優先し、残りを新出で埋める（過去範囲を必ず混ぜる＝累積テスト）
 function buildSession(limit){
   const inF=w=>(cfg.lv==='all'||w.level===cfg.lv)&&(cfg.pos==='all'||w.pos===cfg.pos);
-  const isWeak=w=>{const s=wSt[w.id];return !s||!(s.nM>0);};
+  const isWeak=w=>{const s=wSt[w.id];return !s||!(Math.max(s.nM||0,s.nF||0)>0);};
   const weakOnly=cfg.scope==='weak';
   // 復習は級で絞らない。絞ると他の級の期限切れが消化されず溜まるため
   const allDue=dueWords();// 絞り込み前の期限切れ（停止判定に使う）
