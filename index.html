@@ -3594,12 +3594,16 @@ svg{display:block}
       <div id="mix-hint" style="display:none;font-size:11px;color:var(--ink3);margin-top:8px;line-height:1.5">語ごとに、いちばん合った出題形式を選びます。苦手な語は4択や2択で易しく、定着した語はタイプ入力や並び替えで負荷を上げます</div>
       <div id="flip-hint" style="display:none;font-size:11px;color:var(--ink3);margin-top:8px;line-height:1.5">カードをめくって意味と読みを確認します。テストではないので習熟度や復習予定には反映されません</div>
     </div>
-    <div class="cfg-row"><span class="cfg-label">出題方向</span>
-      <div class="cfg-seg" id="seg-dir">
-        <button class="cfg-seg-btn on" onclick="setCfgSeg('dir','auto',this)">自動</button>
-        <button class="cfg-seg-btn" onclick="setCfgSeg('dir','thai',this)">タイ→日</button>
-        <button class="cfg-seg-btn" onclick="setCfgSeg('dir','jp',this)">日→タイ</button>
+    <div style="padding:14px 20px;border-bottom:1px solid var(--bg2)">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <span class="cfg-label">出題方向</span>
+        <div class="cfg-seg" id="seg-dir">
+          <button class="cfg-seg-btn on" onclick="setCfgSeg('dir','auto',this)">おまかせ</button>
+          <button class="cfg-seg-btn" onclick="setCfgSeg('dir','thai',this)">タイ→日</button>
+          <button class="cfg-seg-btn" onclick="setCfgSeg('dir','jp',this)">日→タイ</button>
+        </div>
       </div>
+      <div id="dir-hint" style="display:none;font-size:11px;color:var(--ink3);margin-top:8px;line-height:1.5">まずタイ語→日本語で意味を固め、定着した語から日本語→タイ語に切り替えます。片方に固定すると、もう片方はいつまでも鍛えられません</div>
     </div>
     <div class="cfg-row"><span class="cfg-label">出題範囲</span>
       <div class="cfg-seg" id="seg-scope">
@@ -3904,20 +3908,30 @@ const DAY=86400000;
 function isFull(id){const s=wSt[id];if(!s)return false;const T=masterT();return (s.nM||0)>=T&&(s.nF||0)>=T;}
 // テスト系の記録を更新する。kind: 'M'=意味（タイ語→日本語）/ 'F'=綴り（日本語→タイ語）
 // 復習間隔はSM-2の簡易版。初回をあえて2日後にするのは、初回の取り出しを遅らせたほうが長期に残るため
-function updSt(w,ok,kind){
+// weak=true は2択での正解。当てずっぽうでも50%当たるため昇格の根拠にはせず、
+// 「次は4択で確かめる」ための通過印(g2)だけ立てて翌日また出す
+function updSt(w,ok,kind,weak){
   const T=masterT();const cur=wSt[w.id]||{};const before=cur.status||STL[0];
   let nM=cur.nM,nF=cur.nF;
   if(nM==null)nM=(cur.n!=null)?cur.n:inferN(before,T);// 旧データからの引き継ぎ
   if(nF==null)nF=0;
+  if(ok&&weak){
+    wSt[w.id]=Object.assign({},cur,{status:stFromN(nM,T),nM:nM,nF:nF,g2:true,
+      ivl:1,ease:cur.ease||2.3,last:Date.now(),due:Date.now()+DAY});
+    recWord(w.id);save();return;
+  }
   const dec=v=>((pref.wrongMode||'reset')==='down')?Math.max(0,v-1):0;
   if(kind==='F')nF=ok?nF+1:dec(nF);
   else          nM=ok?nM+1:dec(nM);
   const succ=cur.rc||0;// これまでの正解回数（間隔の段階）
   let ivl,ease=cur.ease||2.3;
   if(ok){
+    // 2日 → 5日 → 前回×ease。ただし前回×ease を上回らせない。
+    // 一度つまずいて1日に戻った語が、次の正解でいきなり5日に飛ぶのを防ぐ
+    const grown=Math.max(2,Math.round((cur.ivl||2)*ease));
     if(succ<=0)ivl=2;
-    else if(succ===1)ivl=5;
-    else ivl=Math.min(180,Math.max(2,Math.round((cur.ivl||2)*ease)));
+    else if(succ===1)ivl=Math.min(5,grown);
+    else ivl=Math.min(180,grown);
     ease=Math.min(2.8,ease+0.05);
   }else{
     ivl=1;ease=Math.max(1.3,ease-0.25);
@@ -3925,7 +3939,7 @@ function updSt(w,ok,kind){
   const after=stFromN(nM,T);
   const newlyMastered=after===STL[3]&&before!==STL[3];// 新たに「覚えた」に到達
   if(newlyMastered)slog.todayLnd=(slog.todayLnd||0)+1;// 今日覚えた数をカウント
-  wSt[w.id]={status:after,nM:nM,nF:nF,ivl:ivl,ease:ease,
+  wSt[w.id]={status:after,nM:nM,nF:nF,ivl:ivl,ease:ease,g2:ok?!!cur.g2:false,// 誤答で通過印は落とす
     rc:(cur.rc||0)+(ok?1:0),wc:(cur.wc||0)+(ok?0:1),
     last:Date.now(),due:Date.now()+ivl*DAY};
   recWord(w.id);save();
@@ -4227,7 +4241,7 @@ function planFor(w){
   const aT=autoDir(w);
   let p;
   if(!s.last)     p={fmt:'quiz',aT:aT,opts:4};// 初出：4択
-  else if(nM===0) p={fmt:'quiz',aT:aT,opts:2};// 直前に誤答：選択肢を2つに減らす
+  else if(nM===0) p={fmt:'quiz',aT:aT,opts:s.g2?4:2};// 直前に誤答：まず2択、通過したら4択で確かめる
   else if(nM<T)   p={fmt:'quiz',aT:aT,opts:4};// 意味を固める段階
   else if(nF===0) p={fmt:'quiz',aT:aT,opts:4};// 産出の入口はまだ選択式で
   else if(nF<T)   p={fmt:'type',aT:aT,opts:4};// 綴りを書かせる
@@ -4240,9 +4254,8 @@ function planFor(w){
   if(sh>0){                       // 難しく：2択→4択、4択→タイプ
     if(p.fmt==='quiz'&&p.opts===2)p={fmt:'quiz',aT:p.aT,opts:4};
     else if(p.fmt==='quiz')       p={fmt:'type',aT:p.aT,opts:4};
-  }else if(sh<0){                 // 易しく：タイプ/並替→4択、4択→2択
+  }else if(sh<0){                 // 易しく：タイプ/並替→4択（2択までは落とさない）
     if(p.fmt!=='quiz')            p={fmt:'quiz',aT:p.aT,opts:4};
-    else if(p.opts===4)           p={fmt:'quiz',aT:p.aT,opts:2};
   }
   return p;
 }
@@ -4354,8 +4367,9 @@ function openCfg(){
   initPicker('pk-lim', PK_LIM, cfg.limit, v => { cfg.limit = parseInt(v); saveCfg(); });
 }
 function closeCfgOv(e){if(e.target.id==='cfg-ov'){document.getElementById('cfg-ov').classList.remove('open');document.body.style.overflow='';}}
-function setCfgSeg(key,val,btn){cfg[key]=val;btn.closest('.cfg-seg').querySelectorAll('.cfg-seg-btn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');if(key==='mode')updMixHint();saveCfg();}
+function setCfgSeg(key,val,btn){cfg[key]=val;btn.closest('.cfg-seg').querySelectorAll('.cfg-seg-btn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');if(key==='mode'||key==='dir')updMixHint();saveCfg();}
 function updMixHint(){const h=document.getElementById('mix-hint');if(h)h.style.display=cfg.mode==='auto'?'block':'none';
+  const d=document.getElementById('dir-hint');if(d)d.style.display=cfg.dir==='auto'?'block':'none';
   const f=document.getElementById('flip-hint');if(f)f.style.display=cfg.mode==='flip'?'block':'none';}
 
 
@@ -5071,7 +5085,7 @@ function showQz(){
       if(ok){btn.style.background='var(--good-bg)';btn.querySelector('.quiz-opt-num').style.background='var(--good)';btn.querySelector('.quiz-opt-num').style.color='#fff';}
       else{btn.style.background='var(--bad-bg)';btn.querySelector('.quiz-opt-num').style.background='var(--bad)';btn.querySelector('.quiz-opt-num').style.color='#fff';
         Array.from(od.children).forEach(b=>{const sp=b.querySelector('span');if(sp&&sp.textContent===ct){b.style.background='var(--good-bg)';b.querySelector('.quiz-opt-num').style.background='var(--good)';b.querySelector('.quiz-opt-num').style.color='#fff';}});}
-      qSt[ok?'c':'w']++;updSt(w,ok,aT?'M':'F');recAcc(ok);recStrk();if(!ok){badWs.push(w);requeueWrong(w);}updRvBnr(['rv-bar-qz']);
+      qSt[ok?'c':'w']++;updSt(w,ok,aT?'M':'F',od.children.length<=2);recAcc(ok);recStrk();if(!ok){badWs.push(w);requeueWrong(w);}updRvBnr(['rv-bar-qz']);
       clearTimeout(tmrID);
       if(ok){setTimeout(()=>{advance();},700);}
       else{armQzNext(od,ct);}};// 不正解時は正解をタップするまで進まない
