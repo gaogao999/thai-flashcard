@@ -4265,6 +4265,9 @@ let reQ=new Set();
 function requeueWrong(w){
   if(!w||reQ.has(w.id)||cfg.mode==='flip')return;
   if(words.length>=(cfg.limit||20)*2)return;// 際限なく伸びないよう保険
+  // 5問ぶんの間隔を空けられないなら見送る。直後に出し直しても定着しないので、
+  // セッション末の「苦手を復習」に任せたほうがよい
+  if(words.length<idx+5)return;
   reQ.add(w.id);
   words.splice(Math.min(words.length,idx+5+Math.floor(Math.random()*3)),0,w);
 }
@@ -4366,23 +4369,26 @@ function buildSession(limit){
   const isWeak=w=>{const s=wSt[w.id];return !s||!(s.nM>0);};
   const weakOnly=cfg.scope==='weak';
   // 復習は級で絞らない。絞ると他の級の期限切れが消化されず溜まるため
-  let due=dueWords();
-  if(weakOnly)due=due.filter(isWeak);
-  due.sort((a,b)=>wSt[a.id].due-wSt[b.id].due);// 最も長く放置されたものから
+  const allDue=dueWords();// 絞り込み前の期限切れ（停止判定に使う）
+  let due=weakOnly?allDue.filter(isWeak):allDue;
+  due=due.slice().sort((a,b)=>wSt[a.id].due-wSt[b.id].due);// 最も長く放置されたものから
   // 新出は級・品詞の絞り込みに従う
   let fresh=RAW.filter(w=>inF(w)&&!(wSt[w.id]&&wSt[w.id].last));
   fresh=(cfg.order==='score')?fresh.slice().sort((a,b)=>b.score-a.score):shuf(fresh);
   // 期限切れが溜まりすぎていたら新出を止めて復習に専念する（設定の「新出を止める目安」）
+  // 判定は絞り込み前の総数で行う。苦手のみに絞っても、他の語の期限切れは消えないため
   const bl=backlogLimit();
-  const paused=bl>0&&due.length>=bl;
+  const paused=bl>0&&allDue.length>=bl;
   const newQ=paused?0:Math.min(fresh.length,Math.ceil(limit*0.3));
   const rev=due.slice(0,Math.max(0,limit-newQ));
-  const add=fresh.slice(0,Math.max(0,limit-rev.length));
+  // 停止中は復習で埋まらなくても新出を入れない
+  const add=paused?[]:fresh.slice(0,Math.max(0,limit-rev.length));
   const list=mixSeq(rev,add);
-  // まだ足りなければ、期限前でも絞り込み範囲から古い順に補充する
+  // まだ足りなければ、期限前でも絞り込み範囲から古い順に補充する。
+  // 停止中は未テストの語を混ぜない（期限前の復習で埋める）
   if(list.length<limit){
     const used=new Set(list.map(w=>w.id));
-    let fill=RAW.filter(w=>inF(w)&&!used.has(w.id));
+    let fill=RAW.filter(w=>inF(w)&&!used.has(w.id)&&(!paused||(wSt[w.id]&&wSt[w.id].last)));
     if(weakOnly)fill=fill.filter(isWeak);
     fill.sort((a,b)=>((wSt[a.id]&&wSt[a.id].last)||0)-((wSt[b.id]&&wSt[b.id].last)||0));
     list.push(...fill.slice(0,limit-list.length));
