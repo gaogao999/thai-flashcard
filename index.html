@@ -4165,7 +4165,7 @@ function startBM(){
 }
 function _start(wl,label,isCh){
   words=wl;idx=0;stats={bad:0,ok:0,good:0};qSt={c:0,w:0};tpSt={c:0,w:0};
-  badWs=[];okWs=[];qAns=false;reQ=new Set();
+  badWs=[];okWs=[];qAns=false;reQ=new Set();refreshShift();// 難度のずらし幅はこのセッション中は固定
   document.getElementById('pg-title').textContent='';
   document.getElementById('hdr').style.display='none'; // 学習中はメインヘッダー非表示（学習用バーを最上部に）
   document.getElementById('hdr-back').style.display=isCh?'flex':'none';
@@ -4199,7 +4199,11 @@ function recentAcc(){
   if(a.length<10)return null;
   return Math.round(a.reduce((s,v)=>s+v,0)/a.length*100);
 }
-// はしごをずらす段数。+1＝難しく、-1＝易しく
+// セッション中はずらし幅を固定する。1問ごとに判定し直すと、
+// 境界(92%)をまたぐたびに選択肢数が2択と4択で入れ替わって落ち着かないため
+let sessShift=0;
+function refreshShift(){sessShift=diffShift();}
+// はしごをずらす段数。+1＝難しく、-1＝易しく（セッション開始時に一度だけ評価する）
 function diffShift(){
   const p=recentAcc();
   if(p==null)return 0;
@@ -4231,7 +4235,8 @@ function planFor(w){
   else p=aT?(hasEx?{fmt:'ex',aT:aT,opts:4}:{fmt:'type',aT:aT,opts:4})
            :{fmt:'type',aT:aT,opts:4};
   // 直近の正答率が最適域(78〜92%)から外れていたら、全体の難度をひと段ずらす
-  const sh=diffShift();
+  // （判定はセッション開始時の値。途中で切り替わらない）
+  const sh=sessShift;
   if(sh>0){                       // 難しく：2択→4択、4択→タイプ
     if(p.fmt==='quiz'&&p.opts===2)p={fmt:'quiz',aT:p.aT,opts:4};
     else if(p.fmt==='quiz')       p={fmt:'type',aT:p.aT,opts:4};
