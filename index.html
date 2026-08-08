@@ -3573,18 +3573,19 @@ svg{display:block}
     <div style="padding:14px 20px;border-bottom:1px solid var(--bg2)">
       <div class="cfg-label" style="margin-bottom:10px">学習モード</div>
       <div class="cfg-seg" id="seg-mode" style="width:100%">
-        <button class="cfg-seg-btn on" style="flex:1;padding:9px 4px;font-size:12px" onclick="setCfgSeg('mode','flip',this)">事前学習</button>
+        <button class="cfg-seg-btn on" style="flex:1;padding:9px 4px;font-size:12px" onclick="setCfgSeg('mode','auto',this)">おまかせ</button>
         <button class="cfg-seg-btn" style="flex:1;padding:9px 4px;font-size:12px" onclick="setCfgSeg('mode','quiz',this)">4択</button>
         <button class="cfg-seg-btn" style="flex:1;padding:9px 4px;font-size:12px" onclick="setCfgSeg('mode','type',this)">タイプ</button>
         <button class="cfg-seg-btn" style="flex:1;padding:9px 4px;font-size:12px" onclick="setCfgSeg('mode','ex',this)">並替</button>
-        <button class="cfg-seg-btn" style="flex:1;padding:9px 4px;font-size:12px" onclick="setCfgSeg('mode','mix',this)">ミックス</button>
+        <button class="cfg-seg-btn" style="flex:1;padding:9px 4px;font-size:12px" onclick="setCfgSeg('mode','flip',this)">事前学習</button>
       </div>
-      <div id="mix-hint" style="display:none;font-size:11px;color:var(--ink3);margin-top:8px;line-height:1.5">4択・タイプ・並び替えを1問ごとにランダムで出題します</div>
+      <div id="mix-hint" style="display:none;font-size:11px;color:var(--ink3);margin-top:8px;line-height:1.5">語ごとに、いちばん合った出題形式を選びます。苦手な語は4択や2択で易しく、定着した語はタイプ入力や並び替えで負荷を上げます</div>
       <div id="flip-hint" style="display:none;font-size:11px;color:var(--ink3);margin-top:8px;line-height:1.5">カードをめくって意味と読みを確認します。テストではないので習熟度や復習予定には反映されません</div>
     </div>
     <div class="cfg-row"><span class="cfg-label">出題方向</span>
       <div class="cfg-seg" id="seg-dir">
-        <button class="cfg-seg-btn on" onclick="setCfgSeg('dir','thai',this)">タイ→日</button>
+        <button class="cfg-seg-btn on" onclick="setCfgSeg('dir','auto',this)">自動</button>
+        <button class="cfg-seg-btn" onclick="setCfgSeg('dir','thai',this)">タイ→日</button>
         <button class="cfg-seg-btn" onclick="setCfgSeg('dir','jp',this)">日→タイ</button>
       </div>
     </div>
@@ -3692,7 +3693,9 @@ let wPre=ls('tap_pre',{}); // 事前学習（カード）の記録。自己申�
 let strk=ls('tap_streak',{dates:[],best:0,cur:0});
 let slog=ls('tap_slog',{sec:0,words:0,todayIds:[],todayDate:'',wkData:{}});
 let pref=ls('tap_pref',{goal:20,timer:0,onboarded:false,bm:[]});
-let cfg=Object.assign({mode:'flip',dir:'thai',order:'random',scope:'all',limit:20,lv:'all',pos:'all'},ls('tap_cfg',{}));// 学習設定（前回値を復元）
+let cfg=Object.assign({mode:'auto',dir:'auto',order:'random',scope:'all',limit:20,lv:'all',pos:'all'},ls('tap_cfg',{}));// 学習設定（前回値を復元）
+// ミックスはおまかせに統合。出題方向も一度だけ自動へ寄せる（固定のままだと綴りが鍛えられないため）
+if(pref.cfgV!==2){if(cfg.mode==='mix'||cfg.mode==='flip')cfg.mode='auto';cfg.dir='auto';pref.cfgV=2;ss('tap_pref',pref);ss('tap_cfg',cfg);}
 if(![5,10,20].includes(cfg.limit))cfg.limit=20;// 旧設定(50/100/全件)は最大20にクランプ
 function saveCfg(){ss('tap_cfg',cfg);}
 
@@ -3766,7 +3769,8 @@ function recWord(id){
 function saveSec(){const e=Math.round((Date.now()-_t0)/1000);if(e>0&&e<7200)slog.sec+=e;_t0=Date.now();ss('tap_slog',slog);}
 const fmtT=s=>s<60?s+'秒':s<3600?Math.floor(s/60)+'分':Math.floor(s/3600)+'時間'+Math.floor((s%3600)/60)+'分';
 // ── 4択ダミー選択肢生成（同品詞+同レベル優先、苦手単語優先）──
-function pickDistractors(w, pool3){
+function pickDistractors(w, pool3, want){
+  const N=Math.max(1,(want||4)-1);// 必要なダミーの数
   // 優先度1: 同品詞 + 同レベル + 苦手/うろ覚え（最も引っかかりやすい）
   const p1 = pool3.filter(x => x.level===w.level && (getSt(x.id)==='苦手'||getSt(x.id)==='うろ覚え'));
   // 優先度2: 同品詞 + 同レベル
@@ -3794,13 +3798,13 @@ function pickDistractors(w, pool3){
   }
 
   // まず優先度1から埋める
-  pick(p1, 3);
+  pick(p1, N);
   // 足りなければ優先度2
-  if(chosen.length < 3) pick(p2, 3 - chosen.length);
+  if(chosen.length < N) pick(p2, N - chosen.length);
   // 足りなければ優先度3
-  if(chosen.length < 3) pick(p3, 3 - chosen.length);
+  if(chosen.length < N) pick(p3, N - chosen.length);
   // それでも足りなければ全体から
-  if(chosen.length < 3) pick(p4, 3 - chosen.length);
+  if(chosen.length < N) pick(p4, N - chosen.length);
 
   return chosen;
 }
@@ -4148,13 +4152,12 @@ function startBM(){
 }
 function _start(wl,label,isCh){
   words=wl;idx=0;stats={bad:0,ok:0,good:0};qSt={c:0,w:0};tpSt={c:0,w:0};
-  badWs=[];okWs=[];qAns=false;
+  badWs=[];okWs=[];qAns=false;reQ=new Set();
   document.getElementById('pg-title').textContent='';
   document.getElementById('hdr').style.display='none'; // 学習中はメインヘッダー非表示（学習用バーを最上部に）
   document.getElementById('hdr-back').style.display=isCh?'flex':'none';
   document.getElementById('hdr-cfg').style.display='none';
   document.getElementById('bnav').style.display='none'; // 学習中はナビ非表示（mikan方式）
-  const mode=cfg.mode;
   const label2=label+' ・ '+wl.length+'枚';
   ['flip','quiz','type','ex'].forEach(m=>{const el=document.getElementById(m+'-prog');if(el)el.textContent='1 / '+wl.length;});
   document.getElementById('flip-bar').style.width='0%';
@@ -4164,30 +4167,59 @@ function _start(wl,label,isCh){
   ['flip','quiz','type','ex'].forEach(m=>{const el=document.getElementById('rv-bar-'+m);if(el)el.style.display='none';});
   renderStudy();
 }
-// ── 出題ディスパッチ（ミックス対応）───────────────────────
-// ミックス時に前問と同じモードが連続しないよう記録
-let mixLast=null;
-// 現在の単語に対して出題モードを決める（ミックスなら1問ごとにランダム）
-function pickMode(){
-  if(cfg.mode!=='mix')return cfg.mode;
-  const w=words[idx];
-  let opts=['quiz','type'];
-  if(w&&w.ex1_thai_words&&w.ex1_thai_words.includes('|'))opts.push('ex');
-  // 直前と同じモードは避ける（候補が2つ以上ある場合）
-  if(opts.length>1&&mixLast&&opts.includes(mixLast)){
-    const f=opts.filter(m=>m!==mixLast);if(f.length)opts=f;
-  }
-  return opts[Math.floor(Math.random()*opts.length)];
+// ── 出題ディスパッチ ─────────────────────────────────────
+// その語にいま合った出し方（形式・方向・選択肢数）を決める。
+// 苦手なほど易しく、定着しているほど難しくする。方向は習熟度で受容→産出へ切り替える
+// （最適な出題方向は習熟度で逆転するという研究結果に対応）
+// 方向は形式とは独立に決める。まず意味を固め、次に綴り、両方定着したら少ないほうを鍛える
+// true＝タイ語→日本語（受容）/ false＝日本語→タイ語（産出）
+function autoDir(w){
+  const s=(w&&wSt[w.id])||{},T=masterT();
+  const nM=s.nM||0,nF=s.nF||0;
+  if(nM<T)return true;   // 意味がまだ
+  if(nF<T)return false;  // 綴りがまだ
+  return nM<=nF;         // 両方定着後は交互になる
 }
-// 現在の単語を、決めたモードの画面で描画する
+function planFor(w){
+  const s=(w&&wSt[w.id])||{},T=masterT();
+  const nM=s.nM||0,nF=s.nF||0;
+  const hasEx=!!(w&&w.ex1_thai_words&&w.ex1_thai_words.includes('|'));
+  const aT=autoDir(w);
+  if(!s.last)return {fmt:'quiz',aT:aT,opts:4};// 初出：4択
+  if(nM===0) return {fmt:'quiz',aT:aT,opts:2};// 直前に誤答：選択肢を2つに減らす
+  if(nM<T)   return {fmt:'quiz',aT:aT,opts:4};// 意味を固める段階
+  if(nF===0) return {fmt:'quiz',aT:aT,opts:4};// 産出の入口はまだ選択式で
+  if(nF<T)   return {fmt:'type',aT:aT,opts:4};// 綴りを書かせる
+  // 両方定着：意味側なら例文の並び替え（無ければ意味をタイプ）、綴り側ならタイプ
+  return aT?(hasEx?{fmt:'ex',aT:aT,opts:4}:{fmt:'type',aT:aT,opts:4})
+           :{fmt:'type',aT:aT,opts:4};
+}
+// この語をどちらの方向で出すか
+function askThai(w){
+  if(cfg.dir==='thai')return true;
+  if(cfg.dir==='jp')return false;
+  return autoDir(w);// 自動
+}
+// 4択の選択肢数。おまかせのときだけ、苦手な語を2択に落とす
+// （正答率が低い語では選択肢を増やすと逆に学習を損なうため）
+function optCount(w){return cfg.mode==='auto'?planFor(w).opts:4;}
+// 現在の単語を、決めた形式の画面で描画する
 function renderStudy(){
   if(idx>=words.length){showResult();return;}
-  const m=pickMode();mixLast=m;
+  const m=(cfg.mode==='auto')?planFor(words[idx]).fmt:cfg.mode;
   showScr(m==='flip'?'flip':m==='quiz'?'quiz':m==='type'?'type':'ex');
   if(m==='flip')showCard();
   else if(m==='quiz')showQz();
   else if(m==='type')showType();
   else showEx();
+}
+// 間違えた語を同じセッションの後半にもう一度出す（1回の出題で終わらせないため）
+let reQ=new Set();
+function requeueWrong(w){
+  if(!w||reQ.has(w.id)||cfg.mode==='flip')return;
+  if(words.length>=(cfg.limit||20)*2)return;// 際限なく伸びないよう保険
+  reQ.add(w.id);
+  words.splice(Math.min(words.length,idx+5+Math.floor(Math.random()*3)),0,w);
 }
 // 次の単語へ（各モードの「次へ」から呼ぶ）
 function advance(){idx++;renderStudy();}
@@ -4254,7 +4286,7 @@ function openCfg(){
 }
 function closeCfgOv(e){if(e.target.id==='cfg-ov'){document.getElementById('cfg-ov').classList.remove('open');document.body.style.overflow='';}}
 function setCfgSeg(key,val,btn){cfg[key]=val;btn.closest('.cfg-seg').querySelectorAll('.cfg-seg-btn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');if(key==='mode')updMixHint();saveCfg();}
-function updMixHint(){const h=document.getElementById('mix-hint');if(h)h.style.display=cfg.mode==='mix'?'block':'none';
+function updMixHint(){const h=document.getElementById('mix-hint');if(h)h.style.display=cfg.mode==='auto'?'block':'none';
   const f=document.getElementById('flip-hint');if(f)f.style.display=cfg.mode==='flip'?'block':'none';}
 
 
@@ -4818,7 +4850,7 @@ function showCard(){
   updProg('flip-bar','flip-prog');
   updRvBnr(['rv-bar-flip']);
 
-  const st=getSt(w.id);const aT=cfg.dir==='thai';
+  const st=getSt(w.id);const aT=askThai(w);
   const bmBtn='';
   const T=esc(w.thai),K=esc(w.kana),Rm=esc(w.roman),M=esc(w.meaning),P=esc(w.pos),SP=spkBtn(w.thai);
 
@@ -4938,7 +4970,7 @@ function showQz(){
   const w=words[idx];qAns=false;
   const dk=document.getElementById('qz-dk');if(dk){dk.disabled=false;dk.textContent='わからない';dk.classList.remove('qz-dk-hint');}// 「わからない」を再有効化
   updProg('qz-bar','qz-prog');updRvBnr(['rv-bar-qz']);
-  const aT=cfg.dir==='thai';const st=getSt(w.id);
+  const aT=askThai(w);const st=getSt(w.id);
   const bmBtn='';
   if(aT){
     document.getElementById('qz-q').innerHTML='<span class="lvbadge '+w.level+'">'+lvL(w.level)+'</span><span class="stbadge st-'+st+'">'+st+'</span>'
@@ -4950,7 +4982,7 @@ function showQz(){
       +'<div class="word-meaning">'+esc(w.meaning)+'</div><span class="pos-badge">'+esc(w.pos)+'</span>'+bmBtn;
   }
   const pool=RAW.filter(x=>x.id!==w.id&&x.pos===w.pos);
-  const opts=shuf([w,...pickDistractors(w, pool)]);
+  const opts=shuf([w,...pickDistractors(w, pool, optCount(w))]);
   const od=document.getElementById('qz-opts');od.innerHTML='';
   opts.forEach((o,ni)=>{
     const btn=document.createElement('button');btn.className='quiz-opt';
@@ -4961,7 +4993,7 @@ function showQz(){
       if(ok){btn.style.background='var(--good-bg)';btn.querySelector('.quiz-opt-num').style.background='var(--good)';btn.querySelector('.quiz-opt-num').style.color='#fff';}
       else{btn.style.background='var(--bad-bg)';btn.querySelector('.quiz-opt-num').style.background='var(--bad)';btn.querySelector('.quiz-opt-num').style.color='#fff';
         Array.from(od.children).forEach(b=>{const sp=b.querySelector('span');if(sp&&sp.textContent===ct){b.style.background='var(--good-bg)';b.querySelector('.quiz-opt-num').style.background='var(--good)';b.querySelector('.quiz-opt-num').style.color='#fff';}});}
-      qSt[ok?'c':'w']++;updSt(w,ok,aT?'M':'F');recStrk();if(!ok)badWs.push(w);updRvBnr(['rv-bar-qz']);
+      qSt[ok?'c':'w']++;updSt(w,ok,aT?'M':'F');recStrk();if(!ok){badWs.push(w);requeueWrong(w);}updRvBnr(['rv-bar-qz']);
       clearTimeout(tmrID);
       if(ok){setTimeout(()=>{advance();},700);}
       else{armQzNext(od,ct);}};// 不正解時は正解をタップするまで進まない
@@ -4970,16 +5002,16 @@ function showQz(){
   startTmr('qz-tmr',()=>{if(!qAns){qAns=true;playWrong();const ct=aT?w.meaning:w.thai;
     Array.from(od.children).forEach(b=>{b.style.pointerEvents='none';const sp=b.querySelector('span');
       if(sp&&sp.textContent===ct){b.style.background='var(--good-bg)';const n=b.querySelector('.quiz-opt-num');if(n){n.style.background='var(--good)';n.style.color='#fff';}}});
-    qSt.w++;updSt(w,false,aT?'M':'F');badWs.push(w);updRvBnr(['rv-bar-qz']);armQzNext(od,ct);}});// 時間切れも正解をタップして次へ
+    qSt.w++;updSt(w,false,aT?'M':'F');badWs.push(w);requeueWrong(w);updRvBnr(['rv-bar-qz']);armQzNext(od,ct);}});// 時間切れも正解をタップして次へ
 }
 // 「わからない」= 不正解扱い。正解を表示して次へ
 function quizDontKnow(){
   if(qAns)return;qAns=true;playWrong();
-  const w=words[idx];const aT=cfg.dir==='thai';const ct=aT?w.meaning:w.thai;
+  const w=words[idx];const aT=askThai(w);const ct=aT?w.meaning:w.thai;
   const od=document.getElementById('qz-opts');
   Array.from(od.children).forEach(b=>{b.style.pointerEvents='none';const sp=b.querySelector('span');
     if(sp&&sp.textContent===ct){b.style.background='var(--good-bg)';const n=b.querySelector('.quiz-opt-num');if(n){n.style.background='var(--good)';n.style.color='#fff';}}});
-  qSt.w++;updSt(w,false,aT?'M':'F');recStrk();badWs.push(w);updRvBnr(['rv-bar-qz']);
+  qSt.w++;updSt(w,false,aT?'M':'F');recStrk();badWs.push(w);requeueWrong(w);updRvBnr(['rv-bar-qz']);
   clearTimeout(tmrID);armQzNext(od,ct);// 正解をタップするまで進まない
 }
 
@@ -5000,7 +5032,7 @@ function showType(){
   if(idx>=words.length){showResult();return;}
   const w=words[idx];
   updProg('tp-bar','tp-prog');updRvBnr(['rv-bar-tp']);
-  const aT=cfg.dir==='thai';const st=getSt(w.id);
+  const aT=askThai(w);const st=getSt(w.id);
   if(aT){
     document.getElementById('tp-q').innerHTML='<span class="lvbadge '+w.level+'">'+lvL(w.level)+'</span><span class="stbadge st-'+st+'">'+st+'</span>'
       +'<div class="word-main">'+esc(w.thai)+'</div>'+(showKana()?'<div class="word-sub">'+esc(w.kana)+'</div>':'')
@@ -5031,12 +5063,12 @@ function checkType(){
   if(idx>=words.length||tpAns)return;// 判定済みなら何もしない（連打で飛ばさない）
   tpAns=true;clearTimeout(tmrID);
   const w=words[idx],inp=document.getElementById('tp-inp');
-  const ans=inp.value.trim();const aT=cfg.dir==='thai';
+  const ans=inp.value.trim();const aT=askThai(w);
   const ok=typeIsCorrect(w,ans,aT);// 未入力は不正解扱い（＝答えを見て次へ進める）
   tpPrevSt=wSt[w.id]?Object.assign({},wSt[w.id]):null;// 「やっぱり正解」で戻せるよう判定前の記録を控える
   if(ok)playCorrect();else playWrong();
   inp.className='type-inp '+(ok?'ok':'ng');
-  tpSt[ok?'c':'w']++;updSt(w,ok,aT?'M':'F');recStrk();if(!ok)badWs.push(w);updRvBnr(['rv-bar-tp']);
+  tpSt[ok?'c':'w']++;updSt(w,ok,aT?'M':'F');recStrk();if(!ok){badWs.push(w);requeueWrong(w);}updRvBnr(['rv-bar-tp']);
   // 正解・不正解どちらも答えを出す（意味が複数ある単語は他の意味も確認できる）
   inp.disabled=true;
   document.getElementById('tp-submit').style.display='none';
@@ -5061,13 +5093,14 @@ function tpRenderAns(w,ok,ans,aT,ovr){
 function typeMarkCorrect(){
   if(idx>=words.length||!tpAns||tpOvr)return;
   tpOvr=true;
-  const w=words[idx];const aT=cfg.dir==='thai';
+  const w=words[idx];const aT=askThai(w);
   const ans=document.getElementById('tp-inp').value.trim();
   // 判定前の習熟度に戻してから、正解として付け直す
   if(tpPrevSt)wSt[w.id]=tpPrevSt;else delete wSt[w.id];
   tpPrevSt=null;
   tpSt.w=Math.max(0,tpSt.w-1);tpSt.c++;
   const i=badWs.lastIndexOf(w);if(i>=0)badWs.splice(i,1);
+  const j=words.indexOf(w,idx+1);if(reQ.has(w.id)&&j>=0){words.splice(j,1);reQ.delete(w.id);}// 誤答扱いの再出題も取り消す
   updSt(w,true,aT?'M':'F');updRvBnr(['rv-bar-tp']);
   stopSpeak();playCorrect();
   document.getElementById('tp-inp').className='type-inp ok';
@@ -5168,7 +5201,7 @@ function arrCheck(){
     rw.innerHTML='<div class="arrange-result ng">惜しい！正しい順番は：<div class="arrange-correct">'+arrWords.join(' ')+'</div></div>';
   }
   // 習熟度更新（並び替えは例文の理解なので意味側に計上する）
-  qSt[ok?'c':'w']++;updSt(w,ok,'M');recStrk();if(!ok)badWs.push(w);
+  qSt[ok?'c':'w']++;updSt(w,ok,'M');recStrk();if(!ok){badWs.push(w);requeueWrong(w);}
   document.getElementById('arr-actions').style.display='none';
   // 例文の読み上げが終わってから次へ進む（結果を読む時間も確保）
   const minMs=ok?1100:2200;      // 最低これだけは結果を表示する
