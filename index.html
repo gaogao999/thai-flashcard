@@ -3847,7 +3847,7 @@ document.addEventListener('touchstart',_unlockAudio,{passive:true});
 function playCorrect(){if(pref.sfx===false)return;_initSnd();try{_sndC.currentTime=0;const p=_sndC.play();if(p&&p.catch)p.catch(()=>{});}catch{}}// ピンポン♪
 function playWrong(){if(pref.sfx===false)return;_initSnd();try{_sndW.currentTime=0;const p=_sndW.play();if(p&&p.catch)p.catch(()=>{});}catch{}}// ブー
 // 発音ボタン（onclick内のタイ語をJS文字列として安全にエスケープ）
-function spkBtn(thai,mt){return '<button class="spk" onclick="speak(\''+(thai||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\')"'+(mt?' style="margin-top:12px"':'')+'><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L13 19V5L7.5 9.5z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg></button>';}
+function spkBtn(thai,mt){return '<button class="spk" onclick="speak(\''+esc((thai||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'"))+'\')"'+(mt?' style="margin-top:12px"':'')+'><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L13 19V5L7.5 9.5z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg></button>';}
 const lvL=lv=>LVN[lv]||lv;
 const showKana=()=>pref.showKana!==false;// カタカナ読みを表示するか（既定:表示）
 // タイ語(.word-main)が長い場合、1行に収まるようフォントを自動縮小（折り返し防止）
@@ -3867,7 +3867,8 @@ function fitFace(box){
   let s=parseFloat(getComputedStyle(el).fontSize)||32,guard=0;
   while(s>13&&box.scrollHeight>box.clientHeight+1&&guard++<40){s-=1;el.style.fontSize=s+'px';el.style.lineHeight='1.3';}
 }
-const getSt=id=>(wSt[id]&&wSt[id].status)||'苦手';
+const getSt=id=>{const v=wSt[id]&&wSt[id].status;return STL.includes(v)?v:STL[0];};// CSSクラス名に使うため既知の値に限定する
+const lvCls=lv=>LVS.includes(lv)?lv:LVS[0];// レベルも同様
 // ── 判定アルゴリズム（設定画面で変更可能）──
 // pref.masterN : 「覚えた」と判定する連続正解回数（1〜5・既定2）
 // pref.wrongMode: 'reset'=不正解で苦手に戻す（厳しい） / 'down'=1段階だけ下げる（緩い）
@@ -4119,14 +4120,14 @@ function startRUT(lv,ci){
       return;
     }
     const w=tw[qi];
-    document.getElementById('rut-q').innerHTML='<div style="font-size:11px;color:var(--ink3);margin-bottom:12px">'+(qi+1)+' / '+tw.length+'</div><div style="font-size:44px;font-weight:500;margin-bottom:8px">'+w.thai+'</div><div style="font-size:15px;color:var(--ink2)">'+w.kana+'</div>';
+    document.getElementById('rut-q').innerHTML='<div style="font-size:11px;color:var(--ink3);margin-bottom:12px">'+(qi+1)+' / '+tw.length+'</div><div style="font-size:44px;font-weight:500;margin-bottom:8px">'+esc(w.thai)+'</div><div style="font-size:15px;color:var(--ink2)">'+esc(w.kana)+'</div>';
     const pool=RAW.filter(x=>x.id!==w.id&&x.pos===w.pos);
     const opts=shuf([w,...pickDistractors(w, pool)]);
     const od=document.getElementById('rut-o');od.innerHTML='';
     const nums=['①','②','③','④'];
     opts.forEach((o,ni)=>{const btn=document.createElement('button');
       btn.style.cssText='width:100%;padding:14px 16px;border:1px solid var(--bg2);border-radius:12px;background:var(--bg);font-size:15px;font-weight:600;cursor:pointer;text-align:left;display:flex;align-items:center;gap:10px';
-      btn.innerHTML='<span style="width:24px;color:var(--ink3);font-weight:700">'+nums[ni]+'</span><span>'+o.meaning+'</span>';
+      btn.innerHTML='<span style="width:24px;color:var(--ink3);font-weight:700">'+nums[ni]+'</span><span>'+esc(o.meaning)+'</span>';
       btn.onclick=()=>{Array.from(od.children).forEach(b=>b.style.pointerEvents='none');
         const ok=o.id===w.id;
         if(ok){btn.style.background='var(--good-bg)';btn.style.borderColor='var(--good)';}
@@ -4481,7 +4482,7 @@ function importMD(e){
       if(!m){bkSt('復元用データが見つかりません',false);return;}
       const data=JSON.parse(m[1].trim());
       if(!data.raw||!Array.isArray(data.raw)||!data.raw.length){bkSt('単語データがありません',false);return;}
-      RAW=data.raw;
+      RAW=data.raw;assignLevels(RAW);// レベルはスコアから再導出し、ファイル側の値は使わない
       if(data.st&&typeof data.st==='object')wSt=data.st;
       wPre=(data.pre&&typeof data.pre==='object')?data.pre:{};
       if(data.streak&&typeof data.streak==='object')strk=data.streak;
@@ -4685,13 +4686,13 @@ function renderDictList(res,q){
       +'<div class="dict-read">'+esc(w.kana||'')+(w.roman?' ・ '+esc(w.roman):'')+'</div>'
       +'<div class="dict-mean">'+esc(w.meaning||'')+'</div>'
       +'<div class="dict-badges">'
-        +'<span class="lvbadge '+w.level+'">'+lvL(w.level)+'</span>'
+        +'<span class="lvbadge '+lvCls(w.level)+'">'+lvL(w.level)+'</span>'
         +'<span class="pos-badge">'+esc(w.pos||'')+'</span>'
         +'<span class="stbadge st-'+st+'">'+st+'</span>'
       +'</div>'+ex+'</div>';
   }).join('');
 }
-function esc(s){return (''+(s==null?'':s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function esc(s){return (''+(s==null?'':s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 // ブックマークの星アイコン（登録時は塗りつぶし）
 function bmSvg(on){return on
   ?'<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M6 4h12v17l-6-4-6 4z"/></svg>'
@@ -4856,7 +4857,7 @@ function showCard(){
 
   if(aT){
     document.getElementById('ff-front').innerHTML=bmBtn
-      +'<span class="lvbadge '+w.level+'">'+lvL(w.level)+'</span>'
+      +'<span class="lvbadge '+lvCls(w.level)+'">'+lvL(w.level)+'</span>'
       +'<span class="stbadge st-'+st+'">'+st+'</span>'
       +'<div class="word-main">'+T+'</div>'
       +(showKana()?'<div class="word-sub">'+K+'</div>':'')
@@ -4871,7 +4872,7 @@ function showCard(){
     setTimeout(()=>speak(w.thai),400);
   }else{
     document.getElementById('ff-front').innerHTML=bmBtn
-      +'<span class="lvbadge '+w.level+'">'+lvL(w.level)+'</span>'
+      +'<span class="lvbadge '+lvCls(w.level)+'">'+lvL(w.level)+'</span>'
       +'<span class="stbadge st-'+st+'">'+st+'</span>'
       +'<span class="pos-badge">'+P+'</span>'
       +'<div class="word-meaning">'+M+'</div>'
@@ -4973,12 +4974,12 @@ function showQz(){
   const aT=askThai(w);const st=getSt(w.id);
   const bmBtn='';
   if(aT){
-    document.getElementById('qz-q').innerHTML='<span class="lvbadge '+w.level+'">'+lvL(w.level)+'</span><span class="stbadge st-'+st+'">'+st+'</span>'
+    document.getElementById('qz-q').innerHTML='<span class="lvbadge '+lvCls(w.level)+'">'+lvL(w.level)+'</span><span class="stbadge st-'+st+'">'+st+'</span>'
       +'<div class="word-main">'+esc(w.thai)+'</div>'+(showKana()?'<div class="word-sub">'+esc(w.kana)+'</div>':'')
       +spkBtn(w.thai,true)+bmBtn;
     setTimeout(()=>speak(w.thai),300);
   }else{
-    document.getElementById('qz-q').innerHTML='<span class="lvbadge '+w.level+'">'+lvL(w.level)+'</span><span class="stbadge st-'+st+'">'+st+'</span>'
+    document.getElementById('qz-q').innerHTML='<span class="lvbadge '+lvCls(w.level)+'">'+lvL(w.level)+'</span><span class="stbadge st-'+st+'">'+st+'</span>'
       +'<div class="word-meaning">'+esc(w.meaning)+'</div><span class="pos-badge">'+esc(w.pos)+'</span>'+bmBtn;
   }
   const pool=RAW.filter(x=>x.id!==w.id&&x.pos===w.pos);
@@ -5034,13 +5035,13 @@ function showType(){
   updProg('tp-bar','tp-prog');updRvBnr(['rv-bar-tp']);
   const aT=askThai(w);const st=getSt(w.id);
   if(aT){
-    document.getElementById('tp-q').innerHTML='<span class="lvbadge '+w.level+'">'+lvL(w.level)+'</span><span class="stbadge st-'+st+'">'+st+'</span>'
+    document.getElementById('tp-q').innerHTML='<span class="lvbadge '+lvCls(w.level)+'">'+lvL(w.level)+'</span><span class="stbadge st-'+st+'">'+st+'</span>'
       +'<div class="word-main">'+esc(w.thai)+'</div>'+(showKana()?'<div class="word-sub">'+esc(w.kana)+'</div>':'')
       +spkBtn(w.thai,true)
       +'<div style="font-size:12px;color:var(--ink3);margin-top:12px">日本語で意味を入力</div>';
     setTimeout(()=>speak(w.thai),300);
   }else{
-    document.getElementById('tp-q').innerHTML='<span class="lvbadge '+w.level+'">'+lvL(w.level)+'</span><span class="stbadge st-'+st+'">'+st+'</span>'
+    document.getElementById('tp-q').innerHTML='<span class="lvbadge '+lvCls(w.level)+'">'+lvL(w.level)+'</span><span class="stbadge st-'+st+'">'+st+'</span>'
       +'<div class="word-meaning">'+esc(w.meaning)+'</div>'
       +'<div style="font-size:12px;color:var(--ink3);margin-top:10px">タイ語をローマ字で入力</div>';
   }
