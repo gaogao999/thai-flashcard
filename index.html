@@ -4269,11 +4269,25 @@ function renderStudy(){
 let reQ=new Set();
 function requeueWrong(w){
   if(!w||reQ.has(w.id)||cfg.mode==='flip')return;
-  if(words.length>=(cfg.limit||20)*2)return;// 際限なく伸びないよう保険
+  // まだ出していない1問と入れ替えて、セッションの問題数（分母）を変えずに再挑戦の枠を作る。
+  // 落とすのは新出を優先する。期限が来ている復習は残したいのと、押し出された語は
+  // 新出のままなので次回以降そのまま出てくるため
+  let vi=-1;
+  for(let i=words.length-1;i>idx;i--){
+    if(reQ.has(words[i].id))continue;// 他の語の再挑戦枠は奪わない
+    const s=wSt[words[i].id];
+    if(!s||!s.last){vi=i;break;}
+  }
+  if(vi<0)for(let i=words.length-1;i>idx;i--){if(!reQ.has(words[i].id)){vi=i;break;}}
+  // 入れ替えられる問題が残っていなければ見送る（問題数を増やさない）。
+  // 残りが全部ほかの語の再挑戦枠、という場合に起きる
+  if(vi<0)return;
+  const after=words.length-1;// 入れ替えたあとの問題数
   // 5問ぶんの間隔を空けられないなら見送る。直後に出し直しても定着しないので、
   // セッション末の「苦手を復習」に任せたほうがよい
-  if(words.length<idx+5)return;
+  if(after<idx+5)return;
   reQ.add(w.id);
+  if(vi>=0)words.splice(vi,1);
   words.splice(Math.min(words.length,idx+5+Math.floor(Math.random()*3)),0,w);
 }
 // 次の単語へ（各モードの「次へ」から呼ぶ）
