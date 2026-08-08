@@ -3248,6 +3248,15 @@ svg{display:block}
 .res-stat{flex:1;background:var(--bg2);border-radius:14px;padding:16px 8px;text-align:center}
 .res-stat-n{font-size:24px;font-weight:800}
 .res-stat-l{font-size:10px;color:var(--ink3);font-weight:600;margin-top:3px}
+.qkind{font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;letter-spacing:.04em;white-space:nowrap}
+.qkind.rev{background:var(--blue-bg);color:var(--blue)}
+.qkind.new{background:var(--good-bg);color:var(--good)}
+.due-row{display:flex;align-items:center;gap:10px;margin-bottom:9px;font-size:12.5px}
+.due-row:last-child{margin-bottom:0}
+.due-lbl{width:62px;color:var(--ink3);font-weight:600;flex-shrink:0}
+.due-bar{flex:1;background:var(--bg2);border-radius:3px;height:9px;overflow:hidden}
+.due-fill{height:9px;border-radius:3px;background:var(--accent)}
+.due-cnt{width:48px;text-align:right;color:var(--ink2);font-weight:700}
 .pause-note{margin:10px 16px 0;padding:12px 14px;border-radius:12px;background:var(--warn-bg);border:1px solid var(--warn);font-size:12px;line-height:1.65;color:var(--ink2)}
 .pause-note b{display:block;font-size:12.5px;color:var(--warn);margin-bottom:3px}
 .res-next{margin:0 20px 14px;padding:11px 14px;border-radius:12px;background:var(--bg2);font-size:12.5px;color:var(--ink2);line-height:1.6;text-align:center}
@@ -3455,7 +3464,7 @@ svg{display:block}
 <div id="scr-quiz" style="display:none;flex-direction:column;width:100%;flex:1;background:#fff">
   <div class="study-topbar">
     <button class="study-close" onclick="closeCfgOrBack()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
-    <div class="study-prog-text" id="qz-prog">1 / 20</div>
+    <div style="display:flex;align-items:center;gap:8px"><div class="study-prog-text" id="qz-prog">1 / 20</div><span class="qkind" id="qz-kind"></span></div>
     <button class="hdr-act" onclick="openCfg()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 7h9"></path><path d="M17 7h3"></path><circle cx="15" cy="7" r="2"></circle><path d="M4 17h3"></path><path d="M11 17h9"></path><circle cx="9" cy="17" r="2"></circle></svg></button>
   </div>
   <div class="study-progress-wrap"><div class="study-progress-fill" id="qz-bar" style="width:0%"></div></div>
@@ -3472,7 +3481,7 @@ svg{display:block}
 <div id="scr-type" style="display:none;flex-direction:column;width:100%;flex:1;background:#fff">
   <div class="study-topbar">
     <button class="study-close" onclick="closeCfgOrBack()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
-    <div class="study-prog-text" id="tp-prog">1 / 20</div>
+    <div style="display:flex;align-items:center;gap:8px"><div class="study-prog-text" id="tp-prog">1 / 20</div><span class="qkind" id="tp-kind"></span></div>
     <button class="hdr-act" onclick="openCfg()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 7h9"></path><path d="M17 7h3"></path><circle cx="15" cy="7" r="2"></circle><path d="M4 17h3"></path><path d="M11 17h9"></path><circle cx="9" cy="17" r="2"></circle></svg></button>
   </div>
   <div class="study-progress-wrap"><div class="study-progress-fill" id="tp-bar" style="width:0%"></div></div>
@@ -3489,7 +3498,7 @@ svg{display:block}
 <div id="scr-ex" style="display:none;flex-direction:column;width:100%;flex:1;background:#fff">
   <div class="study-topbar">
     <button class="study-close" onclick="closeCfgOrBack()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
-    <div class="study-prog-text" id="ex-prog">1 / 20</div>
+    <div style="display:flex;align-items:center;gap:8px"><div class="study-prog-text" id="ex-prog">1 / 20</div><span class="qkind" id="ex-kind"></span></div>
     <button class="hdr-act" onclick="openCfg()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 7h9"></path><path d="M17 7h3"></path><circle cx="15" cy="7" r="2"></circle><path d="M4 17h3"></path><path d="M11 17h9"></path><circle cx="9" cy="17" r="2"></circle></svg></button>
   </div>
   <div class="study-progress-wrap"><div class="study-progress-fill" id="ex-bar" style="width:0%"></div></div>
@@ -3516,8 +3525,11 @@ svg{display:block}
   <div class="d-grid" id="d-grid"></div>
   <div style="font-size:12px;font-weight:700;color:var(--ink3);padding:14px 16px 8px;letter-spacing:.05em;border-bottom:1px solid var(--bg2)">直近7日間</div>
   <div class="wk-chart" id="wk-chart"></div>
+  <div style="font-size:12px;font-weight:700;color:var(--ink3);padding:14px 16px 8px;letter-spacing:.05em;border-bottom:1px solid var(--bg2)">復習の予定</div>
+  <div class="d-section" id="d-due"></div>
   <div style="font-size:12px;font-weight:700;color:var(--ink3);padding:14px 16px 8px;letter-spacing:.05em;border-bottom:1px solid var(--bg2)">習熟度</div>
   <div class="st-sum" id="st-sum"></div>
+  <div id="st-full" style="font-size:11px;color:var(--ink4);padding:0 16px 4px;text-align:center"></div>
   <div style="font-size:12px;font-weight:700;color:var(--ink3);padding:14px 16px 8px;letter-spacing:.05em;border-bottom:1px solid var(--bg2)">レベル別</div>
   <div class="d-section" id="d-lv"></div>
   <div style="font-size:12px;font-weight:700;color:var(--ink3);padding:14px 16px 8px;letter-spacing:.05em;border-bottom:1px solid var(--bg2)">品詞別</div>
@@ -4172,6 +4184,29 @@ function _start(wl,label,isCh){
 // その語にいま合った出し方（形式・方向・選択肢数）を決める。
 // 苦手なほど易しく、定着しているほど難しくする。方向は習熟度で受容→産出へ切り替える
 // （最適な出題方向は習熟度で逆転するという研究結果に対応）
+// ── 難易度の自動調整（85%ルール）────────────────────────
+// 直近の正誤を記録する。学習速度が最大になるのは正答率85%前後という
+// 計算モデルと実験の結果があるので、そこから外れたら出題の難度をずらす
+const ACC_N=50;// 直近何問を見るか
+function recAcc(ok){
+  const a=slog.acc=slog.acc||[];
+  a.push(ok?1:0);
+  while(a.length>ACC_N)a.shift();
+}
+// 直近の正答率（%）。まだ十分な問題数がなければ null
+function recentAcc(){
+  const a=slog.acc||[];
+  if(a.length<10)return null;
+  return Math.round(a.reduce((s,v)=>s+v,0)/a.length*100);
+}
+// はしごをずらす段数。+1＝難しく、-1＝易しく
+function diffShift(){
+  const p=recentAcc();
+  if(p==null)return 0;
+  if(p>=92)return 1;   // 易しすぎて伸びていない
+  if(p<78)return -1;   // 難しすぎる
+  return 0;
+}
 // 方向は形式とは独立に決める。まず意味を固め、次に綴り、両方定着したら少ないほうを鍛える
 // true＝タイ語→日本語（受容）/ false＝日本語→タイ語（産出）
 function autoDir(w){
@@ -4186,14 +4221,25 @@ function planFor(w){
   const nM=s.nM||0,nF=s.nF||0;
   const hasEx=!!(w&&w.ex1_thai_words&&w.ex1_thai_words.includes('|'));
   const aT=autoDir(w);
-  if(!s.last)return {fmt:'quiz',aT:aT,opts:4};// 初出：4択
-  if(nM===0) return {fmt:'quiz',aT:aT,opts:2};// 直前に誤答：選択肢を2つに減らす
-  if(nM<T)   return {fmt:'quiz',aT:aT,opts:4};// 意味を固める段階
-  if(nF===0) return {fmt:'quiz',aT:aT,opts:4};// 産出の入口はまだ選択式で
-  if(nF<T)   return {fmt:'type',aT:aT,opts:4};// 綴りを書かせる
+  let p;
+  if(!s.last)     p={fmt:'quiz',aT:aT,opts:4};// 初出：4択
+  else if(nM===0) p={fmt:'quiz',aT:aT,opts:2};// 直前に誤答：選択肢を2つに減らす
+  else if(nM<T)   p={fmt:'quiz',aT:aT,opts:4};// 意味を固める段階
+  else if(nF===0) p={fmt:'quiz',aT:aT,opts:4};// 産出の入口はまだ選択式で
+  else if(nF<T)   p={fmt:'type',aT:aT,opts:4};// 綴りを書かせる
   // 両方定着：意味側なら例文の並び替え（無ければ意味をタイプ）、綴り側ならタイプ
-  return aT?(hasEx?{fmt:'ex',aT:aT,opts:4}:{fmt:'type',aT:aT,opts:4})
+  else p=aT?(hasEx?{fmt:'ex',aT:aT,opts:4}:{fmt:'type',aT:aT,opts:4})
            :{fmt:'type',aT:aT,opts:4};
+  // 直近の正答率が最適域(78〜92%)から外れていたら、全体の難度をひと段ずらす
+  const sh=diffShift();
+  if(sh>0){                       // 難しく：2択→4択、4択→タイプ
+    if(p.fmt==='quiz'&&p.opts===2)p={fmt:'quiz',aT:p.aT,opts:4};
+    else if(p.fmt==='quiz')       p={fmt:'type',aT:p.aT,opts:4};
+  }else if(sh<0){                 // 易しく：タイプ/並替→4択、4択→2択
+    if(p.fmt!=='quiz')            p={fmt:'quiz',aT:p.aT,opts:4};
+    else if(p.opts===4)           p={fmt:'quiz',aT:p.aT,opts:2};
+  }
+  return p;
 }
 // この語をどちらの方向で出すか
 function askThai(w){
@@ -4823,6 +4869,12 @@ function updProg(barId,progId){
   const pct=words.length>0?Math.round(idx/words.length*100):0;
   const b=document.getElementById(barId);if(b)b.style.width=pct+'%';
   const p=document.getElementById(progId);if(p)p.textContent=(idx+1)+' / '+words.length;
+  // いまの問題が復習か新出かを出す（間隔反復が動いていることが見えるように）
+  const k=document.getElementById(progId.replace('-prog','-kind'));
+  if(k){const w=words[idx],st=w&&wSt[w.id];
+    if(!w||cfg.mode==='flip'){k.textContent='';k.className='qkind';}
+    else if(st&&st.last){k.textContent='復習';k.className='qkind rev';}
+    else{k.textContent='新出';k.className='qkind new';}}
 }
 function updRvBnr(rvIds){
   const cnt=badWs.length+okWs.length;
@@ -4994,7 +5046,7 @@ function showQz(){
       if(ok){btn.style.background='var(--good-bg)';btn.querySelector('.quiz-opt-num').style.background='var(--good)';btn.querySelector('.quiz-opt-num').style.color='#fff';}
       else{btn.style.background='var(--bad-bg)';btn.querySelector('.quiz-opt-num').style.background='var(--bad)';btn.querySelector('.quiz-opt-num').style.color='#fff';
         Array.from(od.children).forEach(b=>{const sp=b.querySelector('span');if(sp&&sp.textContent===ct){b.style.background='var(--good-bg)';b.querySelector('.quiz-opt-num').style.background='var(--good)';b.querySelector('.quiz-opt-num').style.color='#fff';}});}
-      qSt[ok?'c':'w']++;updSt(w,ok,aT?'M':'F');recStrk();if(!ok){badWs.push(w);requeueWrong(w);}updRvBnr(['rv-bar-qz']);
+      qSt[ok?'c':'w']++;updSt(w,ok,aT?'M':'F');recAcc(ok);recStrk();if(!ok){badWs.push(w);requeueWrong(w);}updRvBnr(['rv-bar-qz']);
       clearTimeout(tmrID);
       if(ok){setTimeout(()=>{advance();},700);}
       else{armQzNext(od,ct);}};// 不正解時は正解をタップするまで進まない
@@ -5003,7 +5055,7 @@ function showQz(){
   startTmr('qz-tmr',()=>{if(!qAns){qAns=true;playWrong();const ct=aT?w.meaning:w.thai;
     Array.from(od.children).forEach(b=>{b.style.pointerEvents='none';const sp=b.querySelector('span');
       if(sp&&sp.textContent===ct){b.style.background='var(--good-bg)';const n=b.querySelector('.quiz-opt-num');if(n){n.style.background='var(--good)';n.style.color='#fff';}}});
-    qSt.w++;updSt(w,false,aT?'M':'F');badWs.push(w);requeueWrong(w);updRvBnr(['rv-bar-qz']);armQzNext(od,ct);}});// 時間切れも正解をタップして次へ
+    qSt.w++;updSt(w,false,aT?'M':'F');recAcc(false);badWs.push(w);requeueWrong(w);updRvBnr(['rv-bar-qz']);armQzNext(od,ct);}});// 時間切れも正解をタップして次へ
 }
 // 「わからない」= 不正解扱い。正解を表示して次へ
 function quizDontKnow(){
@@ -5012,7 +5064,7 @@ function quizDontKnow(){
   const od=document.getElementById('qz-opts');
   Array.from(od.children).forEach(b=>{b.style.pointerEvents='none';const sp=b.querySelector('span');
     if(sp&&sp.textContent===ct){b.style.background='var(--good-bg)';const n=b.querySelector('.quiz-opt-num');if(n){n.style.background='var(--good)';n.style.color='#fff';}}});
-  qSt.w++;updSt(w,false,aT?'M':'F');recStrk();badWs.push(w);requeueWrong(w);updRvBnr(['rv-bar-qz']);
+  qSt.w++;updSt(w,false,aT?'M':'F');recAcc(false);recStrk();badWs.push(w);requeueWrong(w);updRvBnr(['rv-bar-qz']);
   clearTimeout(tmrID);armQzNext(od,ct);// 正解をタップするまで進まない
 }
 
@@ -5069,7 +5121,7 @@ function checkType(){
   tpPrevSt=wSt[w.id]?Object.assign({},wSt[w.id]):null;// 「やっぱり正解」で戻せるよう判定前の記録を控える
   if(ok)playCorrect();else playWrong();
   inp.className='type-inp '+(ok?'ok':'ng');
-  tpSt[ok?'c':'w']++;updSt(w,ok,aT?'M':'F');recStrk();if(!ok){badWs.push(w);requeueWrong(w);}updRvBnr(['rv-bar-tp']);
+  tpSt[ok?'c':'w']++;updSt(w,ok,aT?'M':'F');recAcc(ok);recStrk();if(!ok){badWs.push(w);requeueWrong(w);}updRvBnr(['rv-bar-tp']);
   // 正解・不正解どちらも答えを出す（意味が複数ある単語は他の意味も確認できる）
   inp.disabled=true;
   document.getElementById('tp-submit').style.display='none';
@@ -5100,6 +5152,7 @@ function typeMarkCorrect(){
   if(tpPrevSt)wSt[w.id]=tpPrevSt;else delete wSt[w.id];
   tpPrevSt=null;
   tpSt.w=Math.max(0,tpSt.w-1);tpSt.c++;
+  if(slog.acc&&slog.acc.length)slog.acc[slog.acc.length-1]=1;// 直近の正誤も訂正する
   const i=badWs.lastIndexOf(w);if(i>=0)badWs.splice(i,1);
   const j=words.indexOf(w,idx+1);if(reQ.has(w.id)&&j>=0){words.splice(j,1);reQ.delete(w.id);}// 誤答扱いの再出題も取り消す
   updSt(w,true,aT?'M':'F');updRvBnr(['rv-bar-tp']);
@@ -5202,7 +5255,7 @@ function arrCheck(){
     rw.innerHTML='<div class="arrange-result ng">惜しい！正しい順番は：<div class="arrange-correct">'+arrWords.join(' ')+'</div></div>';
   }
   // 習熟度更新（並び替えは例文の理解なので意味側に計上する）
-  qSt[ok?'c':'w']++;updSt(w,ok,'M');recStrk();if(!ok){badWs.push(w);requeueWrong(w);}
+  qSt[ok?'c':'w']++;updSt(w,ok,'M');recAcc(ok);recStrk();if(!ok){badWs.push(w);requeueWrong(w);}
   document.getElementById('arr-actions').style.display='none';
   // 例文の読み上げが終わってから次へ進む（結果を読む時間も確保）
   const minMs=ok?1100:2200;      // 最低これだけは結果を表示する
@@ -5294,6 +5347,26 @@ function renderDash(){
   }).join('');
   // 習熟度
   document.getElementById('st-sum').innerHTML=STL.map(s=>'<div class="st-sum-item" style="background:'+STB[s]+'"><div class="st-sum-n" style="color:'+STC[s]+'">'+byCnt(s)+'</div><div class="st-sum-l" style="color:'+STC[s]+'">'+s+'</div></div>').join('');
+  // 復習の予定（今後7日 ＋ 期限切れ）
+  const nowD=Date.now();const bk=[0,0,0,0,0,0,0,0];// [期限切れ, 1日後, 2日後, …, 7日後]
+  let later=0,sched=0;
+  for(const id in wSt){const d=wSt[id]&&wSt[id].due;if(!d)continue;sched++;
+    const diff=Math.ceil((d-nowD)/DAY);
+    if(diff<=0)bk[0]++;else if(diff<=7)bk[diff]++;else later++;}
+  const dueMax=Math.max(...bk,later,1);
+  const dueLbl=['期限切れ','明日','2日後','3日後','4日後','5日後','6日後','7日後'];
+  let dh=bk.map((c,i)=>'<div class="due-row"><div class="due-lbl">'+dueLbl[i]+'</div>'
+    +'<div class="due-bar"><div class="due-fill" style="width:'+Math.round(c/dueMax*100)+'%'
+    +(i===0?';background:var(--bad)':'')+'"></div></div><div class="due-cnt">'+c+'語</div></div>').join('');
+  dh+='<div class="due-row"><div class="due-lbl">8日以降</div><div class="due-bar"><div class="due-fill" style="width:'+Math.round(later/dueMax*100)+'%;background:var(--ink4)"></div></div><div class="due-cnt">'+later+'語</div></div>';
+  const accP=recentAcc();
+  dh+='<div style="font-size:11px;color:var(--ink4);margin-top:12px;line-height:1.6">復習予定のある単語 '+sched+'語'
+    +(accP!=null?'　直近'+(slog.acc||[]).length+'問の正答率 '+accP+'%'+(accP>=92?'（易しすぎ→難度を上げています）':accP<78?'（難しすぎ→難度を下げています）':'（最適域）'):'')+'</div>';
+  document.getElementById('d-due').innerHTML=dh;
+  // 「覚えた」のうち綴りも定着している数
+  const fullN=Object.keys(wSt).filter(id=>getSt(id)===STL[3]&&isFull(id)).length;// 「覚えた」の内数になるようにする
+  const sf=document.getElementById('st-full');
+  if(sf)sf.textContent='「覚えた」'+totLnd().toLocaleString()+'語 ・ うち綴りも定着 '+fullN.toLocaleString()+'語';
   // レベル別
   const dLvStats=computeLevelStats();
   document.getElementById('d-lv').innerHTML=LVS.map((lv,i)=>{
