@@ -3248,6 +3248,8 @@ svg{display:block}
 .res-stat{flex:1;background:var(--bg2);border-radius:14px;padding:16px 8px;text-align:center}
 .res-stat-n{font-size:24px;font-weight:800}
 .res-stat-l{font-size:10px;color:var(--ink3);font-weight:600;margin-top:3px}
+.res-next{margin:0 20px 14px;padding:11px 14px;border-radius:12px;background:var(--bg2);font-size:12.5px;color:var(--ink2);line-height:1.6;text-align:center}
+.res-next b{display:block;font-size:10.5px;letter-spacing:.08em;color:var(--accent);margin-bottom:3px}
 .res-st-bar{width:100%;background:var(--bg);border:1px solid var(--bg2);border-radius:16px;padding:16px;margin-bottom:20px}
 .res-acts{width:100%;display:flex;flex-direction:column;gap:10px}
 .res-prim{width:100%;padding:16px;border:none;border-radius:14px;background:var(--accent);color:#fff;font-size:15px;font-weight:700;cursor:pointer}
@@ -3387,7 +3389,7 @@ svg{display:block}
   <div class="stat-row">
     <div class="stat-item"><div class="stat-n" id="hs-tot">0</div><div class="stat-l">今日覚えた</div></div>
     <div class="stat-item"><div class="stat-n" id="hs-lnd" style="color:var(--good)">0</div><div class="stat-l">覚えた</div></div>
-    <div class="stat-item"><div class="stat-n" id="hs-rev" style="color:var(--bad)">0</div><div class="stat-l">要復習</div></div>
+    <div class="stat-item"><div class="stat-n" id="hs-rev" style="color:var(--accent)">0</div><div class="stat-l">今日の復習</div></div>
   </div>
   <button class="home-start" onclick="goStudyAll()">
     <div><div style="font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px"><svg width="17" height="17" viewBox="0 0 24 24" fill="#fff"><path d="M8 5.5v13l11-6.5z"></path></svg>全単語を学習する</div><div class="home-start-sub" id="home-start-sub">全レベル・ランダム順</div></div>
@@ -3566,13 +3568,14 @@ svg{display:block}
     <div style="padding:14px 20px;border-bottom:1px solid var(--bg2)">
       <div class="cfg-label" style="margin-bottom:10px">学習モード</div>
       <div class="cfg-seg" id="seg-mode" style="width:100%">
-        <button class="cfg-seg-btn on" style="flex:1;padding:9px 4px;font-size:12px" onclick="setCfgSeg('mode','flip',this)">カード</button>
+        <button class="cfg-seg-btn on" style="flex:1;padding:9px 4px;font-size:12px" onclick="setCfgSeg('mode','flip',this)">事前学習</button>
         <button class="cfg-seg-btn" style="flex:1;padding:9px 4px;font-size:12px" onclick="setCfgSeg('mode','quiz',this)">4択</button>
         <button class="cfg-seg-btn" style="flex:1;padding:9px 4px;font-size:12px" onclick="setCfgSeg('mode','type',this)">タイプ</button>
         <button class="cfg-seg-btn" style="flex:1;padding:9px 4px;font-size:12px" onclick="setCfgSeg('mode','ex',this)">並替</button>
         <button class="cfg-seg-btn" style="flex:1;padding:9px 4px;font-size:12px" onclick="setCfgSeg('mode','mix',this)">ミックス</button>
       </div>
       <div id="mix-hint" style="display:none;font-size:11px;color:var(--ink3);margin-top:8px;line-height:1.5">4択・タイプ・並び替えを1問ごとにランダムで出題します</div>
+      <div id="flip-hint" style="display:none;font-size:11px;color:var(--ink3);margin-top:8px;line-height:1.5">カードをめくって意味と読みを確認します。テストではないので習熟度や復習予定には反映されません</div>
     </div>
     <div class="cfg-row"><span class="cfg-label">出題方向</span>
       <div class="cfg-seg" id="seg-dir">
@@ -3679,7 +3682,8 @@ function idbGet(k){return idbOpen().then(db=>new Promise((res,rej)=>{const q=db.
 function idbSet(k,v){return idbOpen().then(db=>new Promise((res,rej)=>{const t=db.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=()=>res(true);t.onerror=()=>rej(t.error);}));}
 const DEFAULT_RAW=[{"id": "49", "thai": "ทาง", "kana": "ターン", "roman": "thaaŋ", "meaning": "道", "pos": "名詞", "level": "A1", "score": 35, "ex1_thai": "ทางนี้ดีมาก", "ex1_kana": "ターン ニー ディー マーク", "ex1_roman": "thaaŋ níi dii mâak", "ex1_meaning": "この道はとても良い", "ex1_thai_words": "ทาง|นี้|ดีมาก"}, {"id": "70", "thai": "สบายดีไหม", "kana": "サバーイ ディー マイ", "roman": "sabaay dii máy", "meaning": "お元気ですか？", "pos": "挨拶", "level": "A1", "score": 35}, {"id": "71", "thai": "สบายดี", "kana": "サバーイ ディー", "roman": "sabaay dii", "meaning": "元気である", "pos": "形容詞", "level": "A1", "score": 35}, {"id": "72", "thai": "ขอบคุณ", "kana": "コープ クン", "roman": "khɔ̀ɔp khun", "meaning": "ありがとう", "pos": "挨拶", "level": "A1", "score": 35}, {"id": "73", "thai": "ขอโทษ", "kana": "コー トート", "roman": "khɔ̌ɔ thôot", "meaning": "ごめんなさい", "pos": "挨拶", "level": "A1", "score": 35}, {"id": "74", "thai": "ผม", "kana": "ポム", "roman": "phǒm", "meaning": "私[男性]", "pos": "代名詞", "level": "A1", "score": 35}, {"id": "75", "thai": "เรา", "kana": "ラオ", "roman": "raw", "meaning": "私たち", "pos": "代名詞", "level": "A1", "score": 35}, {"id": "76", "thai": "เขา", "kana": "カオ", "roman": "khǎw", "meaning": "彼", "pos": "代名詞", "level": "A1", "score": 35}, {"id": "77", "thai": "นี่", "kana": "ニー", "roman": "nîi", "meaning": "これ", "pos": "代名詞", "level": "A1", "score": 35}, {"id": "78", "thai": "นี้", "kana": "ニー", "roman": "níi", "meaning": "この〜", "pos": "名詞", "level": "A1", "score": 35}, {"id": "79", "thai": "ชื่อ", "kana": "チュー", "roman": "chʉ̂ʉ", "meaning": "名前", "pos": "名詞", "level": "A1", "score": 35}, {"id": "80", "thai": "ครอบครัว", "kana": "クロープ クルア", "roman": "khrɔ̂ɔp khrua", "meaning": "家族", "pos": "名詞", "level": "A1", "score": 35}, {"id": "81", "thai": "พ่อแม่", "kana": "ポー メー", "roman": "phɔ̂ɔ mɛ̂ɛ", "meaning": "両親", "pos": "名詞", "level": "A1", "score": 35}, {"id": "82", "thai": "พ่อ", "kana": "ポー", "roman": "phɔ̂ɔ", "meaning": "父", "pos": "名詞", "level": "A1", "score": 35}, {"id": "83", "thai": "ตา", "kana": "ター", "roman": "taa", "meaning": "目", "pos": "名詞", "level": "A1", "score": 35}, {"id": "84", "thai": "แม่", "kana": "メー", "roman": "mɛ̂ɛ", "meaning": "母", "pos": "名詞", "level": "A1", "score": 35}, {"id": "85", "thai": "ลูกสาว", "kana": "ルーク サーオ", "roman": "lûuk sǎaw", "meaning": "娘", "pos": "名詞", "level": "A1", "score": 35}, {"id": "86", "thai": "ใช่", "kana": "チャイ", "roman": "chây", "meaning": "はい", "pos": "動詞", "level": "A1", "score": 35}, {"id": "87", "thai": "ไม่ใช่", "kana": "マイ チャイ", "roman": "mây chây", "meaning": "〜ではない", "pos": "動詞", "level": "A1", "score": 35}, {"id": "88", "thai": "ไม่เป็นไร", "kana": "マイ ペン ライ", "roman": "mây pen ray", "meaning": "大丈夫", "pos": "動詞", "level": "A1", "score": 35}, {"id": "89", "thai": "เท่าไร", "kana": "タオライ", "roman": "thâwrày", "meaning": "いくら", "pos": "副詞", "level": "A1", "score": 35}, {"id": "90", "thai": "ที่ไหน", "kana": "ティー ナイ", "roman": "thîi nǎy", "meaning": "どこ", "pos": "副詞", "level": "A1", "score": 35}, {"id": "91", "thai": "ทำไม", "kana": "タムマイ", "roman": "thammaĭ", "meaning": "なぜ", "pos": "副詞", "level": "A1", "score": 35}, {"id": "92", "thai": "มี", "kana": "ミー", "roman": "mii", "meaning": "持っている", "pos": "動詞", "level": "A1", "score": 35, "ex1_thai": "เขามีหนังสือมาก", "ex1_kana": "カオ ミー ナンスー マーク", "ex1_roman": "khǎw mii nǎŋsʉ̌ʉ mâak", "ex1_meaning": "彼はたくさんの本を持っている", "ex1_thai_words": "เขา|มี|หนังสือ|มาก"}, {"id": "93", "thai": "กิน", "kana": "ギン", "roman": "kin", "meaning": "食べる", "pos": "動詞", "level": "A1", "score": 35, "ex1_thai": "ผมกินข้าวทุกวัน", "ex1_kana": "ポム ギン カーオ トゥック ワン", "ex1_roman": "phǒm kin khâaw thúk wan", "ex1_meaning": "私は毎日ご飯を食べる", "ex1_thai_words": "ผม|กินข้าว|ทุกวัน"}, {"id": "94", "thai": "ดื่ม", "kana": "ドゥーム", "roman": "dʉ̀ʉm", "meaning": "飲む", "pos": "動詞", "level": "A1", "score": 35, "ex1_thai": "หล่อนดื่มน้ำเย็น", "ex1_kana": "ロン ドゥーム ナーム イェン", "ex1_roman": "lɔ̀ɔn dʉ̀ʉm náam yen", "ex1_meaning": "彼女は冷たい水を飲む", "ex1_thai_words": "หล่อน|ดื่ม|น้ำเย็น"}, {"id": "95", "thai": "ไป", "kana": "パイ", "roman": "pay", "meaning": "行く", "pos": "動詞", "level": "A1", "score": 35, "ex1_thai": "เราไปตลาดด้วยกัน", "ex1_kana": "ラオ パイ タラート ドゥアイ ガン", "ex1_roman": "raw pay talàat dûay kan", "ex1_meaning": "私たちは一緒に市場へ行く", "ex1_thai_words": "เรา|ไป|ตลาด|ด้วยกัน"}, {"id": "96", "thai": "มา", "kana": "マー", "roman": "maa", "meaning": "来る", "pos": "動詞", "level": "A1", "score": 35, "ex1_thai": "เขามาโรงเรียน", "ex1_kana": "カオ マー ローンリアン", "ex1_roman": "khǎw maa rooŋrian", "ex1_meaning": "彼は学校に来る", "ex1_thai_words": "เขา|มา|โรงเรียน"}, {"id": "97", "thai": "อยู่", "kana": "ユー", "roman": "yùu", "meaning": "いる", "pos": "動詞", "level": "A1", "score": 35}, {"id": "98", "thai": "ซื้อ", "kana": "スー", "roman": "sʉ́ʉ", "meaning": "買う", "pos": "動詞", "level": "A1", "score": 35}, {"id": "99", "thai": "ขาย", "kana": "カーイ", "roman": "khǎay", "meaning": "売る", "pos": "動詞", "level": "A1", "score": 35}, {"id": "100", "thai": "พูด", "kana": "プート", "roman": "phûut", "meaning": "話す", "pos": "動詞", "level": "A1", "score": 35, "ex1_thai": "เขาพูดภาษาไทยได้", "ex1_kana": "カオ プート パーサー タイ ダーイ", "ex1_roman": "khǎw phûut phaasǎa thay dâay", "ex1_meaning": "彼はタイ語が話せる", "ex1_thai_words": "เขา|พูด|ภาษาไทย|ได้"}, {"id": "101", "thai": "ฟัง", "kana": "ファン", "roman": "faŋ", "meaning": "聞く", "pos": "動詞", "level": "A1", "score": 35}, {"id": "102", "thai": "อ่าน", "kana": "アーン", "roman": "àan", "meaning": "読む", "pos": "動詞", "level": "A1", "score": 35}, {"id": "103", "thai": "เขียน", "kana": "キアン", "roman": "khǐan", "meaning": "書く", "pos": "動詞", "level": "A1", "score": 35}, {"id": "104", "thai": "นอน", "kana": "ノーン", "roman": "nɔɔn", "meaning": "寝る", "pos": "動詞", "level": "A1", "score": 35}, {"id": "105", "thai": "ดู", "kana": "ドゥー", "roman": "duu", "meaning": "見る", "pos": "動詞", "level": "A1", "score": 35}, {"id": "106", "thai": "รู้", "kana": "ルー", "roman": "rúu", "meaning": "知っている", "pos": "動詞", "level": "A1", "score": 35}, {"id": "107", "thai": "เข้าใจ", "kana": "カオ ジャイ", "roman": "khâwcay", "meaning": "わかる", "pos": "動詞", "level": "A1", "score": 35}, {"id": "108", "thai": "ชอบ", "kana": "チョープ", "roman": "chɔ̂ɔp", "meaning": "好きである", "pos": "動詞", "level": "A1", "score": 35, "ex1_thai": "ฉันชอบกินส้มตำ", "ex1_kana": "チャン チョープ ギン ソムタム", "ex1_roman": "chǎn chɔ̂ɔp kin sômtam", "ex1_meaning": "私はソムタムが好きだ", "ex1_thai_words": "ฉัน|ชอบ|กิน|ส้มตำ"}, {"id": "109", "thai": "ต้องการ", "kana": "トーン ガーン", "roman": "tɔ̂ŋkaan", "meaning": "必要とする", "pos": "動詞", "level": "A1", "score": 35}, {"id": "110", "thai": "ได้", "kana": "ダーイ", "roman": "dâay", "meaning": "できる", "pos": "動詞", "level": "A1", "score": 35}, {"id": "111", "thai": "ดี", "kana": "ディー", "roman": "dii", "meaning": "良い", "pos": "形容詞", "level": "A1", "score": 35}, {"id": "112", "thai": "ใหญ่", "kana": "ヤイ", "roman": "yày", "meaning": "大きい", "pos": "形容詞", "level": "A1", "score": 35}, {"id": "113", "thai": "เล็ก", "kana": "レック", "roman": "lék", "meaning": "小さい", "pos": "形容詞", "level": "A1", "score": 35}, {"id": "114", "thai": "ร้อน", "kana": "ローン", "roman": "rɔ́ɔn", "meaning": "暑い", "pos": "形容詞", "level": "A1", "score": 35}, {"id": "115", "thai": "เย็น", "kana": "イェン", "roman": "yen", "meaning": "冷たい", "pos": "形容詞", "level": "A1", "score": 35}, {"id": "116", "thai": "แพง", "kana": "ペーン", "roman": "phɛɛŋ", "meaning": "高い[値段が]", "pos": "形容詞", "level": "A1", "score": 35}, {"id": "117", "thai": "ถูก", "kana": "トゥーク", "roman": "thùuk", "meaning": "安い", "pos": "形容詞", "level": "A1", "score": 35}];
 let RAW=DEFAULT_RAW;let idbOK=true;// RAWはbootRAW()でIndexedDBから非同期読み込み
-let wSt=ls('tap_st',{});
+let wSt=ls('tap_st',{});   // テスト系（4択・タイプ・並び替え）の客観的な記録。習熟度と復習予定はここだけが動かす
+let wPre=ls('tap_pre',{}); // 事前学習（カード）の記録。自己申告なので習熟度・復習予定には影響させない
 let strk=ls('tap_streak',{dates:[],best:0,cur:0});
 let slog=ls('tap_slog',{sec:0,words:0,todayIds:[],todayDate:'',wkData:{}});
 let pref=ls('tap_pref',{goal:20,timer:0,onboarded:false,bm:[]});
@@ -3705,7 +3709,7 @@ function calcStreak(){
 })();
 let _t0=Date.now();
 
-function save(){if(idbOK)idbSet('tap_raw',RAW).catch(()=>{});else ss('tap_raw',RAW);ss('tap_st',wSt);ss('tap_streak',strk);ss('tap_slog',slog);ss('tap_pref',pref);}
+function save(){if(idbOK)idbSet('tap_raw',RAW).catch(()=>{});else ss('tap_raw',RAW);ss('tap_st',wSt);ss('tap_pre',wPre);ss('tap_streak',strk);ss('tap_slog',slog);ss('tap_pref',pref);}
 // 同梱辞書の版。words.json更新時にこの数字を上げると既存利用者も最新版に更新される
 const SEED_VER=6;
 // 同梱の辞書(words.json 約1.8万語)を読み込む。?vでSWの古いキャッシュを回避。失敗時はnull
@@ -3873,21 +3877,64 @@ function inferN(status,T){
   if(status===STL[1])return 1;
   return 0;
 }
-function updSt(w,ok){
+const DAY=86400000;
+// 意味も綴りも定着したか（表示は「覚えた」のまま。降格させず、完了の印だけ足す）
+function isFull(id){const s=wSt[id];if(!s)return false;const T=masterT();return (s.nM||0)>=T&&(s.nF||0)>=T;}
+// テスト系の記録を更新する。kind: 'M'=意味（タイ語→日本語）/ 'F'=綴り（日本語→タイ語）
+// 復習間隔はSM-2の簡易版。初回をあえて2日後にするのは、初回の取り出しを遅らせたほうが長期に残るため
+function updSt(w,ok,kind){
   const T=masterT();const cur=wSt[w.id]||{};const before=cur.status||STL[0];
-  let n=cur.n;if(n==null)n=inferN(before,T);
-  if(ok)n=n+1;
-  else n=((pref.wrongMode||'reset')==='down')?Math.max(0,n-1):0;
-  const after=stFromN(n,T);
+  let nM=cur.nM,nF=cur.nF;
+  if(nM==null)nM=(cur.n!=null)?cur.n:inferN(before,T);// 旧データからの引き継ぎ
+  if(nF==null)nF=0;
+  const dec=v=>((pref.wrongMode||'reset')==='down')?Math.max(0,v-1):0;
+  if(kind==='F')nF=ok?nF+1:dec(nF);
+  else          nM=ok?nM+1:dec(nM);
+  const succ=cur.rc||0;// これまでの正解回数（間隔の段階）
+  let ivl,ease=cur.ease||2.3;
+  if(ok){
+    if(succ<=0)ivl=2;
+    else if(succ===1)ivl=5;
+    else ivl=Math.min(180,Math.max(2,Math.round((cur.ivl||2)*ease)));
+    ease=Math.min(2.8,ease+0.05);
+  }else{
+    ivl=1;ease=Math.max(1.3,ease-0.25);
+  }
+  const after=stFromN(nM,T);
   const newlyMastered=after===STL[3]&&before!==STL[3];// 新たに「覚えた」に到達
   if(newlyMastered)slog.todayLnd=(slog.todayLnd||0)+1;// 今日覚えた数をカウント
-  wSt[w.id]={status:after,n:n};recWord(w.id);save();
-  // 「マスター」トーストは表示しない（ユーザー要望で削除）
+  wSt[w.id]={status:after,nM:nM,nF:nF,ivl:ivl,ease:ease,
+    rc:(cur.rc||0)+(ok?1:0),wc:(cur.wc||0)+(ok?0:1),
+    last:Date.now(),due:Date.now()+ivl*DAY};
+  recWord(w.id);save();
+}
+// 事前学習（カード）の記録。自己申告なので習熟度も復習予定も動かさない
+function updPre(w,r){
+  const p=wPre[w.id]||{};
+  wPre[w.id]={seen:(p.seen||0)+1,self:r,last:Date.now()};
+  recWord(w.id);save();
+}
+// 旧データ（{status,n}のみ）を新形式へ移行する。
+// 復習期限は間隔の0.5〜1.0倍に散らす。同じ日に置くと翌日に数百語が一斉に期限切れになるため
+const SCHED_V=1;
+function migrateSched(){
+  if(pref.schedV===SCHED_V)return;
+  const T=masterT(),now=Date.now();
+  const IVL=[0,2,5,12,27,62];
+  for(const id in wSt){
+    const cur=wSt[id];if(!cur||cur.nM!=null)continue;
+    let n=cur.n;if(n==null)n=inferN(cur.status,T);
+    const iv=IVL[Math.min(IVL.length-1,Math.max(0,n))];
+    wSt[id]={status:cur.status||stFromN(n,T),nM:n,nF:0,ivl:iv,ease:2.3,
+      rc:Math.max(0,n),wc:0,last:now,
+      due:iv>0?now+Math.round(iv*DAY*(0.5+Math.random()*0.5)):now};
+  }
+  pref.schedV=SCHED_V;save();
 }
 // 閾値変更時に全単語の状態を再計算
 function recomputeAllSt(){
   const T=masterT();
-  for(const id in wSt){let n=wSt[id].n;if(n==null)n=inferN(wSt[id].status,T);wSt[id]={status:stFromN(n,T),n:n};}
+  for(const id in wSt){const s=wSt[id];let n=s.nM;if(n==null)n=(s.n!=null)?s.n:inferN(s.status,T);s.nM=n;s.status=stFromN(n,T);}
 }
 let _toastTimer=null;
 function showLevelUpToast(){
@@ -4202,22 +4249,78 @@ function openCfg(){
 }
 function closeCfgOv(e){if(e.target.id==='cfg-ov'){document.getElementById('cfg-ov').classList.remove('open');document.body.style.overflow='';}}
 function setCfgSeg(key,val,btn){cfg[key]=val;btn.closest('.cfg-seg').querySelectorAll('.cfg-seg-btn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');if(key==='mode')updMixHint();saveCfg();}
-function updMixHint(){const h=document.getElementById('mix-hint');if(h)h.style.display=cfg.mode==='mix'?'block':'none';}
+function updMixHint(){const h=document.getElementById('mix-hint');if(h)h.style.display=cfg.mode==='mix'?'block':'none';
+  const f=document.getElementById('flip-hint');if(f)f.style.display=cfg.mode==='flip'?'block':'none';}
 
 
 
+// 復習の期限が来ている語（級をまたいで全体から数える）
+function dueWords(){
+  const now=Date.now();
+  return RAW.filter(w=>{const s=wSt[w.id];return s&&s.due&&s.due<=now;});
+}
+// 復習と新出を均等に混ぜる（同じ種類が固まらないように）
+function mixSeq(rev,add){
+  if(!add.length)return rev.slice();
+  if(!rev.length)return add.slice();
+  const out=[];let i=0,j=0;
+  for(let k=rev.length+add.length;k>0;k--){
+    if(j<add.length&&(i>=rev.length||(j/add.length)<(i/rev.length)))out.push(add[j++]);
+    else out.push(rev[i++]);
+  }
+  return out;
+}
+// セッションを組む。復習を優先し、残りを新出で埋める（過去範囲を必ず混ぜる＝累積テスト）
+function buildSession(limit){
+  const inF=w=>(cfg.lv==='all'||w.level===cfg.lv)&&(cfg.pos==='all'||w.pos===cfg.pos);
+  const isWeak=w=>{const s=wSt[w.id];return !s||!(s.nM>0);};
+  const weakOnly=cfg.scope==='weak';
+  // 復習は級で絞らない。絞ると他の級の期限切れが消化されず溜まるため
+  let due=dueWords();
+  if(weakOnly)due=due.filter(isWeak);
+  due.sort((a,b)=>wSt[a.id].due-wSt[b.id].due);// 最も長く放置されたものから
+  // 新出は級・品詞の絞り込みに従う
+  let fresh=RAW.filter(w=>inF(w)&&!(wSt[w.id]&&wSt[w.id].last));
+  fresh=(cfg.order==='score')?fresh.slice().sort((a,b)=>b.score-a.score):shuf(fresh);
+  // 期限切れが定員の2倍以上溜まっていたら新出を止める（復習の雪だるま防止）
+  const newQ=due.length>=limit*2?0:Math.min(fresh.length,Math.ceil(limit*0.3));
+  const rev=due.slice(0,Math.max(0,limit-newQ));
+  const add=fresh.slice(0,Math.max(0,limit-rev.length));
+  const list=mixSeq(rev,add);
+  // まだ足りなければ、期限前でも絞り込み範囲から古い順に補充する
+  if(list.length<limit){
+    const used=new Set(list.map(w=>w.id));
+    let fill=RAW.filter(w=>inF(w)&&!used.has(w.id));
+    if(weakOnly)fill=fill.filter(isWeak);
+    fill.sort((a,b)=>((wSt[a.id]&&wSt[a.id].last)||0)-((wSt[b.id]&&wSt[b.id].last)||0));
+    list.push(...fill.slice(0,limit-list.length));
+  }
+  return {list:list,rev:rev.length,add:add.length,dueTotal:due.length};
+}
+// 事前学習（カード）：まだテストしていない語を優先して見せる
+function buildPreSession(limit){
+  const inF=w=>(cfg.lv==='all'||w.level===cfg.lv)&&(cfg.pos==='all'||w.pos===cfg.pos);
+  const pool=RAW.filter(inF);
+  const untested=pool.filter(w=>!(wSt[w.id]&&wSt[w.id].last));
+  const uid=new Set(untested.map(w=>w.id));
+  const list=[...shuf(untested.filter(w=>!wPre[w.id])),...shuf(untested.filter(w=>wPre[w.id]))];
+  if(list.length<limit)list.push(...shuf(pool.filter(w=>!uid.has(w.id))).slice(0,limit-list.length));
+  return list.slice(0,limit);
+}
 function applyCfg(){
   saveCfg();// 選んだ設定を保存して次回に引き継ぐ
   document.getElementById('cfg-ov').classList.remove('open');
   document.body.style.overflow='';
-  let f=RAW.filter(w=>(cfg.lv==='all'||w.level===cfg.lv)&&(cfg.pos==='all'||w.pos===cfg.pos));
-  if(cfg.scope==='weak')f=f.filter(w=>{const s=getSt(w.id);return s==='苦手'||s==='うろ覚え';});// 苦手のみに絞る
-  if(!f.length){alert(cfg.scope==='weak'?'この範囲に苦手な単語はありません':'該当する単語がありません');return;}
-  if(cfg.order==='random')f=shuf(f);
-  else if(cfg.order==='weak')f=f.slice().sort((a,b)=>STL.indexOf(getSt(a.id))-STL.indexOf(getSt(b.id)));
-  else f=f.slice().sort((a,b)=>b.score-a.score);
-  const lbl=(cfg.lv==='all'?'全レベル':lvL(cfg.lv))+(cfg.scope==='weak'?'・苦手':'');
-  fromCh=false;_start(f.slice(0,cfg.limit),lbl,false);
+  const lvL2=(cfg.lv==='all'?'全レベル':lvL(cfg.lv));
+  if(cfg.mode==='flip'){// カードは事前学習。復習スケジュールには乗せない
+    const pl=buildPreSession(cfg.limit);
+    if(!pl.length){alert('該当する単語がありません');return;}
+    fromCh=false;_start(pl,lvL2+'・事前学習',false);return;
+  }
+  const s=buildSession(cfg.limit);
+  if(!s.list.length){alert(cfg.scope==='weak'?'この範囲に苦手な単語はありません':'該当する単語がありません');return;}
+  const lbl=lvL2+(cfg.scope==='weak'?'・苦手':'')+(s.rev?'・復習'+s.rev:'');
+  fromCh=false;_start(s.list,lbl,false);
 }
 
 // ── CSV ────────────────────────────────────────────────
@@ -4298,7 +4401,7 @@ function exportMD(){
     const now=new Date();const pad=n=>(''+n).padStart(2,'0');
     const ts=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate())+' '+pad(now.getHours())+':'+pad(now.getMinutes());
     const fn='thai-flashcard-backup-'+now.getFullYear()+pad(now.getMonth()+1)+pad(now.getDate())+'-'+pad(now.getHours())+pad(now.getMinutes())+'.md';
-    const data={v:1,exportedAt:now.toISOString(),raw:RAW,st:wSt,streak:strk,slog:slog,pref:pref};
+    const data={v:2,exportedAt:now.toISOString(),raw:RAW,st:wSt,pre:wPre,streak:strk,slog:slog,pref:pref};
     const esc=s=>(''+(s==null?'':s)).replace(/\|/g,'\\|').replace(/\r?\n/g,' ');
     let md='# タイ語フラッシュカード バックアップ\n\n';
     md+='- 保存日時: '+ts+'\n- 単語数: '+RAW.length+'\n\n';
@@ -4335,9 +4438,11 @@ function importMD(e){
       if(!data.raw||!Array.isArray(data.raw)||!data.raw.length){bkSt('単語データがありません',false);return;}
       RAW=data.raw;
       if(data.st&&typeof data.st==='object')wSt=data.st;
+      wPre=(data.pre&&typeof data.pre==='object')?data.pre:{};
       if(data.streak&&typeof data.streak==='object')strk=data.streak;
       if(data.slog&&typeof data.slog==='object')slog=data.slog;
       if(data.pref&&typeof data.pref==='object')pref=data.pref;
+      migrateSched();// 旧バックアップには復習予定が無いので付与する
       save();
       const wc=document.getElementById('word-cnt');if(wc)wc.textContent=RAW.length;
       bkSt('復元しました（'+RAW.length+'件）',true);
@@ -4557,11 +4662,11 @@ function renderHome(){
   document.getElementById('hero-sub').textContent=lnd+' / '+tot+' 件 覚えた';
   document.getElementById('hs-tot').textContent=slog.todayLnd||0;// 今日覚えた数
   document.getElementById('hs-lnd').textContent=lnd;
-  document.getElementById('hs-rev').textContent=revCnt();
+  document.getElementById('hs-rev').textContent=dueWords().length;// 復習の期限が来ている語数
   document.getElementById('word-cnt').textContent=RAW.length;
   // 「全単語を学習する」ボタンのサブ表示を現在の設定に合わせる
   const hss=document.getElementById('home-start-sub');
-  if(hss){const om={random:'ランダム順',weak:'苦手優先',score:'スコア順'};hss.textContent=(cfg.lv==='all'?'全レベル':lvL(cfg.lv))+(cfg.scope==='weak'?'・苦手のみ':'')+'・'+(om[cfg.order]||'ランダム順');}
+  if(hss){const d=dueWords().length;hss.textContent=(cfg.lv==='all'?'全レベル':lvL(cfg.lv))+(cfg.scope==='weak'?'・苦手のみ':'')+(d?'・復習'+d+'語':'・復習なし');}
   document.getElementById('stk-n').textContent=strk.cur;
   const goal=pref.goal||20,td=slog.todayIds.length,gp=Math.min(100,Math.round(td/goal*100));
   document.getElementById('goal-lbl').textContent='今日 '+td+'/'+goal+'語';
@@ -4634,7 +4739,7 @@ function addReminder(){
     rmSt('カレンダーに追加しました（毎日 '+pad(h)+':'+pad(m)+'）',true);
   }catch(err){rmSt('エラー: '+err.message,false);}
 }
-function resetAll(){if(!confirm('進捗をリセットしますか？'))return;wSt={};badWs=[];okWs=[];strk={dates:[],best:0,cur:0};slog={sec:0,words:0,todayIds:[],todayLnd:0,todayDate:localDay(),wkData:{}};_t0=Date.now();save();renderSettings();renderHome();}
+function resetAll(){if(!confirm('進捗をリセットしますか？'))return;wSt={};wPre={};badWs=[];okWs=[];strk={dates:[],best:0,cur:0};slog={sec:0,words:0,todayIds:[],todayLnd:0,todayDate:localDay(),wkData:{}};_t0=Date.now();save();renderSettings();renderHome();}
 
 // ── 学習状態 ────────────────────────────────────────────
 let words=[],idx=0,flipped=false;
@@ -4779,8 +4884,9 @@ function doSwipe(dir){
   fc.style.opacity='0';
   setTimeout(()=>answer(dir==='right'?'good':'bad'),280);
 }
+// カードは事前学習。自己申告なので習熟度ではなく wPre に記録する
 function answer(r){
-  const w=words[idx];stats[r]++;updSt(w,r!=='bad');recStrk();
+  const w=words[idx];stats[r]++;updPre(w,r);recStrk();
   if(r==='bad')badWs.push(w);if(r==='ok')okWs.push(w);
   idx++;clearTimeout(tmrID);showCard();
 }
@@ -4828,7 +4934,7 @@ function showQz(){
       if(ok){btn.style.background='var(--good-bg)';btn.querySelector('.quiz-opt-num').style.background='var(--good)';btn.querySelector('.quiz-opt-num').style.color='#fff';}
       else{btn.style.background='var(--bad-bg)';btn.querySelector('.quiz-opt-num').style.background='var(--bad)';btn.querySelector('.quiz-opt-num').style.color='#fff';
         Array.from(od.children).forEach(b=>{const sp=b.querySelector('span');if(sp&&sp.textContent===ct){b.style.background='var(--good-bg)';b.querySelector('.quiz-opt-num').style.background='var(--good)';b.querySelector('.quiz-opt-num').style.color='#fff';}});}
-      qSt[ok?'c':'w']++;updSt(w,ok);recStrk();if(!ok)badWs.push(w);updRvBnr(['rv-bar-qz']);
+      qSt[ok?'c':'w']++;updSt(w,ok,aT?'M':'F');recStrk();if(!ok)badWs.push(w);updRvBnr(['rv-bar-qz']);
       clearTimeout(tmrID);
       if(ok){setTimeout(()=>{advance();},700);}
       else{armQzNext(od,ct);}};// 不正解時は正解をタップするまで進まない
@@ -4837,7 +4943,7 @@ function showQz(){
   startTmr('qz-tmr',()=>{if(!qAns){qAns=true;playWrong();const ct=aT?w.meaning:w.thai;
     Array.from(od.children).forEach(b=>{b.style.pointerEvents='none';const sp=b.querySelector('span');
       if(sp&&sp.textContent===ct){b.style.background='var(--good-bg)';const n=b.querySelector('.quiz-opt-num');if(n){n.style.background='var(--good)';n.style.color='#fff';}}});
-    qSt.w++;updSt(w,false);badWs.push(w);updRvBnr(['rv-bar-qz']);armQzNext(od,ct);}});// 時間切れも正解をタップして次へ
+    qSt.w++;updSt(w,false,aT?'M':'F');badWs.push(w);updRvBnr(['rv-bar-qz']);armQzNext(od,ct);}});// 時間切れも正解をタップして次へ
 }
 // 「わからない」= 不正解扱い。正解を表示して次へ
 function quizDontKnow(){
@@ -4846,7 +4952,7 @@ function quizDontKnow(){
   const od=document.getElementById('qz-opts');
   Array.from(od.children).forEach(b=>{b.style.pointerEvents='none';const sp=b.querySelector('span');
     if(sp&&sp.textContent===ct){b.style.background='var(--good-bg)';const n=b.querySelector('.quiz-opt-num');if(n){n.style.background='var(--good)';n.style.color='#fff';}}});
-  qSt.w++;updSt(w,false);recStrk();badWs.push(w);updRvBnr(['rv-bar-qz']);
+  qSt.w++;updSt(w,false,aT?'M':'F');recStrk();badWs.push(w);updRvBnr(['rv-bar-qz']);
   clearTimeout(tmrID);armQzNext(od,ct);// 正解をタップするまで進まない
 }
 
@@ -4900,10 +5006,10 @@ function checkType(){
   const w=words[idx],inp=document.getElementById('tp-inp');
   const ans=inp.value.trim();const aT=cfg.dir==='thai';
   const ok=typeIsCorrect(w,ans,aT);// 未入力は不正解扱い（＝答えを見て次へ進める）
-  tpPrevSt=wSt[w.id]?{status:wSt[w.id].status,n:wSt[w.id].n}:null;// 「やっぱり正解」で戻せるように控える
+  tpPrevSt=wSt[w.id]?Object.assign({},wSt[w.id]):null;// 「やっぱり正解」で戻せるよう判定前の記録を控える
   if(ok)playCorrect();else playWrong();
   inp.className='type-inp '+(ok?'ok':'ng');
-  tpSt[ok?'c':'w']++;updSt(w,ok);recStrk();if(!ok)badWs.push(w);updRvBnr(['rv-bar-tp']);
+  tpSt[ok?'c':'w']++;updSt(w,ok,aT?'M':'F');recStrk();if(!ok)badWs.push(w);updRvBnr(['rv-bar-tp']);
   // 正解・不正解どちらも答えを出す（意味が複数ある単語は他の意味も確認できる）
   inp.disabled=true;
   document.getElementById('tp-submit').style.display='none';
@@ -4935,7 +5041,7 @@ function typeMarkCorrect(){
   tpPrevSt=null;
   tpSt.w=Math.max(0,tpSt.w-1);tpSt.c++;
   const i=badWs.lastIndexOf(w);if(i>=0)badWs.splice(i,1);
-  updSt(w,true);updRvBnr(['rv-bar-tp']);
+  updSt(w,true,aT?'M':'F');updRvBnr(['rv-bar-tp']);
   stopSpeak();playCorrect();
   document.getElementById('tp-inp').className='type-inp ok';
   tpRenderAns(w,true,ans,aT,true);
@@ -5034,8 +5140,8 @@ function arrCheck(){
   }else{
     rw.innerHTML='<div class="arrange-result ng">惜しい！正しい順番は：<div class="arrange-correct">'+arrWords.join(' ')+'</div></div>';
   }
-  // 習熟度更新
-  qSt[ok?'c':'w']++;updSt(w,ok);recStrk();if(!ok)badWs.push(w);
+  // 習熟度更新（並び替えは例文の理解なので意味側に計上する）
+  qSt[ok?'c':'w']++;updSt(w,ok,'M');recStrk();if(!ok)badWs.push(w);
   document.getElementById('arr-actions').style.display='none';
   // 例文の読み上げが終わってから次へ進む（結果を読む時間も確保）
   const minMs=ok?1100:2200;      // 最低これだけは結果を表示する
@@ -5052,6 +5158,22 @@ function arrCheck(){
   speak(w.ex1_thai,()=>setTimeout(go,Math.max(400,minMs-(Date.now()-t0))));
 }
 
+// このセッションの語がいつ戻ってくるかを出す。間隔反復が効いていることが見えないと続ける理由が伝わらない
+function nextRevHtml(){
+  if(cfg.mode==='flip')return '<div class="res-next">事前学習は復習予定に入りません。テストで出題すると復習が始まります</div>';
+  const now=Date.now(),b={d1:0,d3:0,w1:0,later:0};
+  let any=false;
+  words.forEach(w=>{const s=wSt[w.id];if(!s||!s.due)return;any=true;
+    const d=(s.due-now)/DAY;
+    if(d<=1.5)b.d1++;else if(d<=3.5)b.d3++;else if(d<=7.5)b.w1++;else b.later++;});
+  if(!any)return '';
+  const p=[];
+  if(b.d1)p.push('明日 '+b.d1+'語');
+  if(b.d3)p.push('3日後 '+b.d3+'語');
+  if(b.w1)p.push('1週間以内 '+b.w1+'語');
+  if(b.later)p.push('それ以降 '+b.later+'語');
+  return '<div class="res-next"><b>次の復習</b>'+p.join('・')+'</div>';
+}
 // ── 結果 ─────────────────────────────────────────────────
 function showResult(){
   clearTimeout(tmrID);saveSec();recStrk();
@@ -5070,6 +5192,7 @@ function showResult(){
     +'<div class="res-stat"><div class="res-stat-n" style="color:var(--bad)">'+wr+'</div><div class="res-stat-l">不正解</div></div>'
     +'<div class="res-stat"><div class="res-stat-n" style="color:var(--accent)">'+acc+'%</div><div class="res-stat-l">正答率</div></div>'
     +'</div>'
+    +nextRevHtml()
     +'<div class="res-st-bar" style="text-align:left">'
     +'<div style="font-size:12px;font-weight:700;color:var(--ink3);margin-bottom:12px">現在の習熟度</div>';
   STL.forEach(s=>{const cnt=stC[s];const p=RAW.length>0?Math.round(cnt/RAW.length*100):0;
@@ -5146,6 +5269,7 @@ window.addEventListener('beforeunload',saveSec);
 window.addEventListener('visibilitychange',()=>{if(document.hidden)saveSec();});
 // RAWをIndexedDBから読み込んでから起動
 bootRAW().then(()=>{
+  migrateSched();// 旧データに復習予定を付与（期限は散らす）
   if(!pref.onboarded){document.getElementById('ob-ov').style.display='flex';}
   else{switchTab('home');}
 });
