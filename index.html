@@ -4308,6 +4308,21 @@ function requeueWrong(w){
 }
 // 次の単語へ（各モードの「次へ」から呼ぶ）
 function advance(){idx++;renderStudy();}
+// 発音を最後まで聞かせてから次へ進む（日本語→タイ語で正解したとき）。
+// 読み上げが始まらない環境でも止まらないよう上限を設ける
+function advanceAfterSpeak(thai,scr,minMs){
+  const myIdx=idx,t0=Date.now();let moved=false,capID=null;
+  const go=()=>{
+    if(moved)return;moved=true;clearTimeout(capID);
+    // 待っている間に学習を抜けた／別の問題に移った場合は進めない
+    if(idx!==myIdx)return;
+    const el=document.getElementById('scr-'+scr);if(el&&el.style.display==='none')return;
+    advance();
+  };
+  capID=setTimeout(go,6000);
+  // 効果音と重ならないよう少し待ってから読み上げる
+  setTimeout(()=>speak(thai,()=>setTimeout(go,Math.max(250,minMs-(Date.now()-t0)))),320);
+}
 
 // ── 学習設定モーダル ──────────────────────────────────
 // ── ドラム式ピッカー ──────────────────────────────────
@@ -5026,7 +5041,11 @@ function flipCard(){
   fci.style.transition=''; // flipアニメーションを有効化
   fci.classList.toggle('flipped',flipped);
   document.getElementById('flip-btns').style.display=flipped?'flex':'none';
-  if(flipped)clearTimeout(tmrID);
+  if(flipped){
+    clearTimeout(tmrID);
+    // 日本語→タイ語は裏返してタイ語が出たところで読み上げる（表は日本語なので読めない）
+    const w=words[idx];if(w&&!askThai(w))setTimeout(()=>speak(w.thai),260);
+  }
 }
 function doSwipe(dir){
   clearTimeout(tmrID);
@@ -5059,6 +5078,9 @@ function armQzNext(od,ct){
   });
   const dk=document.getElementById('qz-dk');
   if(dk){dk.disabled=true;dk.textContent='正解をタップして次へ →';dk.classList.add('qz-dk-hint');}
+  // 日本語→タイ語は問題文が読み上げられないので、答え合わせで正解の発音を聞かせる
+  const w=words[idx];
+  if(w&&!askThai(w))setTimeout(()=>speak(w.thai),320);
 }
 function showQz(){
   if(idx>=words.length){showResult();return;}
@@ -5090,7 +5112,7 @@ function showQz(){
         Array.from(od.children).forEach(b=>{const sp=b.querySelector('span');if(sp&&sp.textContent===ct){b.style.background='var(--good-bg)';b.querySelector('.quiz-opt-num').style.background='var(--good)';b.querySelector('.quiz-opt-num').style.color='#fff';}});}
       qSt[ok?'c':'w']++;updSt(w,ok,aT?'M':'F',od.children.length<=2);recAcc(ok);recStrk();if(!ok){badWs.push(w);requeueWrong(w);}updRvBnr(['rv-bar-qz']);
       clearTimeout(tmrID);
-      if(ok){setTimeout(()=>{advance();},700);}
+      if(ok){if(aT)setTimeout(()=>{advance();},700);else advanceAfterSpeak(w.thai,'quiz',700);}// 日本語→タイ語は発音を聞いてから次へ
       else{armQzNext(od,ct);}};// 不正解時は正解をタップするまで進まない
     od.appendChild(btn);});
   requestAnimationFrame(()=>{fitWords(document.getElementById('qz-q'));fitFace(document.getElementById('qz-q'));});// タイ語1行・意味は枠内
@@ -5168,7 +5190,9 @@ function checkType(){
   inp.disabled=true;
   document.getElementById('tp-submit').style.display='none';
   tpRenderAns(w,ok,ans,aT,false);
-  if(!ok)speak(w.thai);// 不正解のときだけ読み直す（正解時は効果音と重ならないように）
+  // 不正解なら読み直す。日本語→タイ語は正解でも発音を聞かせる（効果音と重ならないよう少し待つ）
+  if(!ok)speak(w.thai);
+  else if(!aT)setTimeout(()=>speak(w.thai),420);
 }
 // 答え合わせパネル。ovr=「やっぱり正解」で訂正した場合
 function tpRenderAns(w,ok,ans,aT,ovr){
@@ -5179,7 +5203,9 @@ function tpRenderAns(w,ok,ans,aT,ovr){
     // 自分の解答は「不正解（消し線）」と「訂正した（緑）」のときだけ出す
     +(ans&&(!ok||ovr)?'<div class="tp-ans-you'+(ovr?' kept':'')+'">'+esc(ans)+'</div>':'')
     +'<div class="tp-ans-v">'+esc(aT?w.meaning:w.thai)+'</div>'
-    +(sub?'<div class="tp-ans-sub">'+sub+'</div>':'')+'</div>'
+    +(sub?'<div class="tp-ans-sub">'+sub+'</div>':'')
+    +(aT?'':spkBtn(w.thai,true))// 答えがタイ語のときは聞き直せるようにする
+    +'</div>'
     // 「右折」＝「右に曲がる」のような言い換えは自動判定できないので自分で訂正できるようにする
     +(!ok&&ans?'<button class="tp-ok-btn" onclick="typeMarkCorrect()">やっぱり正解にする</button>':'')
     +'<button class="tp-next" onclick="advance()">次へ →</button>';
@@ -5201,6 +5227,7 @@ function typeMarkCorrect(){
   stopSpeak();playCorrect();
   document.getElementById('tp-inp').className='type-inp ok';
   tpRenderAns(w,true,ans,aT,true);
+  if(!aT)setTimeout(()=>speak(w.thai),420);// 日本語→タイ語は訂正後も発音を聞かせる
 }
 
 // ── 例文 ─────────────────────────────────────────────────
