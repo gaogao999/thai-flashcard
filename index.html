@@ -4472,10 +4472,18 @@ function buildSession(limit){
   const inF=w=>(cfg.lv==='all'||w.level===cfg.lv)&&(cfg.pos==='all'||w.pos===cfg.pos);
   const isWeak=w=>{const s=wSt[w.id];return !s||!(Math.max(s.nM||0,s.nF||0)>0);};
   const weakOnly=cfg.scope==='weak';
-  // 復習は級で絞らない。絞ると他の級の期限切れが消化されず溜まるため
-  const allDue=dueWords();// 絞り込み前の期限切れ（停止判定に使う）
+  // 復習は級で切り捨てない（絞ると他の級の期限切れが消化されず溜まるため）が、
+  // 選んだ級以下を先に出す。4級を選んでいるのに準1級ばかり出るのを避けつつ、
+  // 選んだ級で埋まらないぶんは上の級から補って消化を続ける
+  const mx=cfg.lv==='all'?LVS.length-1:LVS.indexOf(cfg.lv);
+  const atOrBelow=w=>{if(cfg.lv==='all')return true;const i=LVS.indexOf(w.level);return i>=0&&i<=mx;};
+  const allDue=dueWords();// 絞り込み前の期限切れ（優先モードの判定に使う）
   let due=weakOnly?allDue.filter(isWeak):allDue;
-  due=due.slice().sort((a,b)=>wSt[a.id].due-wSt[b.id].due);// 最も長く放置されたものから
+  due=due.slice().sort((a,b)=>{
+    const pa=atOrBelow(a)?0:1,pb=atOrBelow(b)?0:1;
+    if(pa!==pb)return pa-pb;              // まず選んだ級以下
+    return wSt[a.id].due-wSt[b.id].due;   // その中で最も長く放置されたものから
+  });
   // 新出は級・品詞の絞り込みに従う
   let fresh=RAW.filter(w=>inF(w)&&!(wSt[w.id]&&wSt[w.id].last));
   fresh=(cfg.order==='score')?fresh.slice().sort((a,b)=>b.score-a.score):shuf(fresh);
