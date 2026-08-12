@@ -3259,6 +3259,7 @@ svg{display:block}
 .due-cnt{width:48px;text-align:right;color:var(--ink2);font-weight:700}
 .pause-note{margin:10px 16px 0;padding:12px 14px;border-radius:12px;background:var(--warn-bg);border:1px solid var(--warn);font-size:12px;line-height:1.65;color:var(--ink2)}
 .pause-note b{display:block;font-size:12.5px;color:var(--warn);margin-bottom:3px}
+.pause-note em{font-style:normal;font-weight:700;color:var(--warn)}/* 本文中の強調（見出しのbと違い改行しない）*/
 .res-next{margin:0 20px 14px;padding:11px 14px;border-radius:12px;background:var(--bg2);font-size:12.5px;color:var(--ink2);line-height:1.6;text-align:center}
 .res-next b{display:block;font-size:10.5px;letter-spacing:.08em;color:var(--accent);margin-bottom:3px}
 .res-st-bar{width:100%;background:var(--bg);border:1px solid var(--bg2);border-radius:16px;padding:16px;margin-bottom:20px}
@@ -3550,6 +3551,8 @@ svg{display:block}
   <div style="font-size:11px;color:var(--ink4);padding:6px 14px 12px;line-height:1.6">連続で正解した回数が設定値に達すると「覚えた」と判定します。間違えると、設定に応じて苦手に戻すか1段階だけ下げます。回数を変更すると現在の判定も再計算されます。</div>
   <div class="set-row"><span class="set-lbl">復習を優先する目安</span><select class="set-sel" id="s-backlog" onchange="savePrefs()"><option value="1.5">1セッションの1.5倍</option><option value="2">2倍（推奨）</option><option value="3">3倍</option><option value="0">切り替えない</option></select></div>
   <div style="font-size:11px;color:var(--ink4);padding:6px 14px 12px;line-height:1.6">復習の期限切れがこの語数を超えたら、新出の割合を3割から2割に絞って復習を優先します。1語覚えるたびに将来の復習が5回ほど発生するため、投入を続けると期限切れが増え続け、本来忘れる直前に出すはずだった語が手遅れになります。新出が完全に止まることはありません。<span id="s-backlog-now"></span></div>
+  <div class="set-row"><span class="set-lbl">新語のまとめ出し</span><select class="set-sel" id="s-unlock" onchange="savePrefs()"><option value="50">復習50問ごと</option><option value="100">復習100問ごと（推奨）</option><option value="200">復習200問ごと</option><option value="0">まとめず少しずつ混ぜる</option></select></div>
+  <div style="font-size:11px;color:var(--ink4);padding:6px 14px 12px;line-height:1.6">復習を優先しているあいだ、ここで決めた問数の復習を終えるごとに、次の1回を新語だけのまとめ回にします。少しずつ混ぜるより区切りが分かりやすい反面、間隔が短いほど新語が増えて復習も増えます。<span id="s-unlock-now"></span></div>
   <div class="set-row"><span class="set-lbl">総単語数</span><span class="set-val" id="s-tot"></span></div>
   <div class="set-row"><span class="set-lbl">覚えた単語</span><span class="set-val" id="s-lnd"></span></div>
   <div class="set-row"><span class="set-lbl">連続学習日数</span><span class="set-val" id="s-str"></span></div>
@@ -3912,6 +3915,10 @@ function isFull(id){const s=wSt[id];if(!s)return false;const T=masterT();return 
 // 「次は4択で確かめる」ための通過印(g2)だけ立てて翌日また出す
 function updSt(w,ok,kind,weak){
   const T=masterT();const cur=wSt[w.id]||{};const before=cur.status||STL[0];
+  // 復習を何問こなしたか。まとめて新語を出すサイクルの進捗に使う（新出は数えない）。
+  // 1回ぶん＋セッション1回のはみ出しで頭打ちにする。青天井にすると、
+  // 通常配分で長く続けたあとに復習優先へ入った瞬間、まとめ回が何十回も連続してしまう
+  if(cur.last){const u=newUnlockN();if(u>0)slog.revCred=Math.min((slog.revCred||0)+1,u+(cfg.limit||20));}
   let nM=cur.nM,nF=cur.nF;
   if(nM==null)nM=(cur.n!=null)?cur.n:inferN(before,T);// 旧データからの引き継ぎ
   if(nF==null)nF=0;
@@ -4410,11 +4417,22 @@ function backlogX(){const v=pref.backlogX;return (v===0||v===1.5||v===2||v===3)?
 function backlogLimit(){const x=backlogX();return x?Math.ceil((cfg.limit||20)*x):0;}
 // いま復習優先モードか（新出を止めるのではなく絞る）
 function revFocus(){const l=backlogLimit();return l>0&&dueWords().length>=l;}
-// 復習優先モードでの新出の割合。0にすると期限切れが多いとき何か月も新語が出なくなるので止めない。
+// 「まとめず混ぜる」を選んだときの、復習優先モードでの新出の割合。
 // 1割に置いたのは、80問/日で回した90日シミュレーションで期限切れが減る側に入る上限が
 // おおよそ1日8〜12語（＝1〜1.5割）だったため。2割にすると新語は増えるが復習が追いつかなくなる
 const FOCUS_NEW=0.1, NORM_NEW=0.3;
-// そのときの1セッションの内訳（画面の説明に使う）
+// 復習優先モードのとき、この問数の復習を消化すると次の1回が新語だけのまとめ回になる（0＝まとめない）
+function newUnlockN(){const v=pref.newUnlock;return (v===0||v===50||v===100||v===200)?v:100;}
+// まとめ回までに消化した復習の問数
+function revCred(){return slog.revCred||0;}
+// 復習優先モードでいまどの状態か。画面の説明とセッション組み立ての両方で使う
+function focusState(limit){
+  const lim=limit||cfg.limit||20, u=newUnlockN();
+  if(u<=0){const nq=Math.max(1,Math.ceil(lim*FOCUS_NEW));return {mode:'mix',add:nq,rev:Math.max(0,lim-nq)};}
+  const left=Math.max(0,u-revCred());
+  return {mode:left>0?'rev':'batch',left:left,unlock:u,batch:lim};
+}
+// そのときの1セッションの内訳（通常配分の説明に使う）
 function sessMix(limit){
   const lim=limit||cfg.limit||20;
   const nq=Math.max(1,Math.ceil(lim*(revFocus()?FOCUS_NEW:NORM_NEW)));
@@ -4467,16 +4485,23 @@ function buildSession(limit){
   // 溜まっていても新出は止めない。割合を絞って「復習→新出」のサイクルで消化する。
   // 完全に止めると、期限切れが千語あるようなときに何か月も新語が出なくなってしまう
   const focus=bl>0&&allDue.length>=bl;
-  const newQ=Math.min(fresh.length,Math.max(fresh.length?1:0,Math.ceil(limit*(focus?FOCUS_NEW:NORM_NEW))));
-  const rev=due.slice(0,Math.max(0,limit-newQ));
+  const fs=focus?focusState(limit):null;
+  // 復習をまとめて消化しきったら、次の1回は新語だけの「まとめ回」にする
+  const batch=!!(fs&&fs.mode==='batch'&&fresh.length);
+  let newQ;
+  if(batch)          newQ=Math.min(fresh.length,limit);
+  else if(fs&&fs.mode==='rev') newQ=0;// まとめ回まではひたすら復習
+  else               newQ=Math.min(fresh.length,Math.max(fresh.length?1:0,Math.ceil(limit*(focus?FOCUS_NEW:NORM_NEW))));
+  const rev=batch?[]:due.slice(0,Math.max(0,limit-newQ));
   // 復習優先のときは決めた枠を超えて新出を足さない。
   // 「苦手のみ」などで復習が少ししか取れないと、空いた分が全部新出になってしまうため
   const room=Math.max(0,limit-rev.length);
-  const add=fresh.slice(0,focus?Math.min(newQ,room):room);
+  const add=fresh.slice(0,(focus&&!batch)?Math.min(newQ,room):room);
   // 復習優先のときは、まとめて復習してから新出を挟む（均等に混ぜるより消化の実感が出る）
-  const list=focus?blockSeq(rev,add):mixSeq(rev,add);
+  const list=batch?add.slice():(focus?blockSeq(rev,add):mixSeq(rev,add));
   // まだ足りなければ、期限前でも絞り込み範囲から古い順に補充する。
-  // 復習優先のときは未テストの語を混ぜない（決めた割合を超えて新出が増えないように）
+  // 復習優先のときは未テストの語を混ぜない（決めた割合を超えて新出が増えないように）。
+  // まとめ回で新語が足りなかった場合も、残りは復習で埋める
   if(list.length<limit){
     const used=new Set(list.map(w=>w.id));
     let fill=RAW.filter(w=>inF(w)&&!used.has(w.id)&&(!focus||(wSt[w.id]&&wSt[w.id].last)));
@@ -4484,7 +4509,7 @@ function buildSession(limit){
     fill.sort((a,b)=>((wSt[a.id]&&wSt[a.id].last)||0)-((wSt[b.id]&&wSt[b.id].last)||0));
     list.push(...fill.slice(0,limit-list.length));
   }
-  return {list:list,rev:rev.length,add:add.length,dueTotal:due.length,focus:focus};
+  return {list:list,rev:rev.length,add:add.length,dueTotal:due.length,focus:focus,batch:batch};
 }
 // 事前学習（カード）：まだテストしていない語を優先して見せる
 function buildPreSession(limit){
@@ -4508,7 +4533,9 @@ function applyCfg(){
   }
   const s=buildSession(cfg.limit);
   if(!s.list.length){alert(cfg.scope==='weak'?'この範囲に苦手な単語はありません':'該当する単語がありません');return;}
-  const lbl=lvL2+(cfg.scope==='weak'?'・苦手':'')+(s.rev?'・復習'+s.rev:'');
+  // まとめ回を始めたら、貯めた復習の消化ぶんを使う
+  if(s.batch){slog.revCred=Math.max(0,revCred()-newUnlockN());save();}
+  const lbl=lvL2+(cfg.scope==='weak'?'・苦手':'')+(s.batch?'・新語まとめ':(s.rev?'・復習'+s.rev:''));
   fromCh=false;_start(s.list,lbl,false);
 }
 
@@ -4855,16 +4882,20 @@ function renderHome(){
   document.getElementById('word-cnt').textContent=RAW.length;
   // 「全単語を学習する」ボタンのサブ表示を現在の設定に合わせる
   const hss=document.getElementById('home-start-sub');
-  if(hss){const d=dueWords().length;hss.textContent=(cfg.lv==='all'?'全レベル':lvL(cfg.lv))+(cfg.scope==='weak'?'・苦手のみ':'')+(d?'・復習'+d+'語':'・復習なし')+(revFocus()?'・復習を優先中':'');}
+  const fs0=revFocus()?focusState():null;
+  if(hss){const d=dueWords().length;hss.textContent=(cfg.lv==='all'?'全レベル':lvL(cfg.lv))+(cfg.scope==='weak'?'・苦手のみ':'')+(d?'・復習'+d+'語':'・復習なし')
+    +(fs0?(fs0.mode==='batch'?'・次は新語まとめ':'・復習を優先中'):'');}
   // 復習が溜まって新出を絞っているときは、いまのサイクルを出す
   const pn2=document.getElementById('pause-note');
   if(pn2){
-    if(revFocus()){
-      const m=sessMix();
+    if(fs0){
+      let msg;
+      if(fs0.mode==='mix'){const m=sessMix();msg='1回の学習は<em>復習'+m.rev+'語 → 新出'+m.add+'語</em>のくり返しで進みます。';}
+      else if(fs0.mode==='batch')msg='<em>次の1回は新語'+fs0.batch+'語のまとめ回</em>です。';
+      else msg='あと<em>'+fs0.left+'問</em>の復習で、<em>新語'+fs0.batch+'語のまとめ回</em>になります（復習'+fs0.unlock+'問ごと）。';
       pn2.style.display='block';
-      pn2.innerHTML='<b>復習を優先しています</b>期限切れが'+dueWords().length+'語（目安 '+backlogLimit()+'語）。'
-        +'1回の学習は<b>復習'+m.rev+'語 → 新出'+m.add+'語</b>のくり返しで進みます。'
-        +'消化して目安を下回れば自動で通常の配分に戻ります。目安は設定で変えられます。';
+      pn2.innerHTML='<b>復習を優先しています</b>期限切れが'+dueWords().length+'語（目安 '+backlogLimit()+'語）。'+msg
+        +'消化して目安を下回れば自動で通常の配分に戻ります。設定で変えられます。';
     }else pn2.style.display='none';
   }
   document.getElementById('stk-n').textContent=strk.cur;
@@ -4896,6 +4927,7 @@ function savePrefs(){
   pref.showKana=document.getElementById('s-kana').value==='1';
   pref.sfx=document.getElementById('s-sfx').value==='1';
   pref.backlogX=parseFloat(document.getElementById('s-backlog').value);
+  pref.newUnlock=parseInt(document.getElementById('s-unlock').value,10);
   if(changed)recomputeAllSt();
   save();renderHome();renderSettings();
 }
@@ -4909,9 +4941,14 @@ function renderSettings(){
   document.getElementById('s-sfx').value=pref.sfx===false?'0':'1';
   document.getElementById('s-backlog').value=String(backlogX());
   const bn=document.getElementById('s-backlog-now');
-  if(bn){const lim=backlogLimit(),m=sessMix();
-    bn.textContent=lim?'　今の設定では期限切れ'+lim+'語で復習優先に切り替わります（現在 '+dueWords().length+'語・1回あたり復習'+m.rev+'＋新出'+m.add+'）。'
+  if(bn){const lim=backlogLimit();
+    bn.textContent=lim?'　今の設定では期限切れ'+lim+'語で復習優先に切り替わります（現在 '+dueWords().length+'語）。'
       :'　現在 '+dueWords().length+'語が期限切れです。';}
+  document.getElementById('s-unlock').value=String(newUnlockN());
+  const un=document.getElementById('s-unlock-now');
+  if(un){const u=newUnlockN(),lim=cfg.limit||20;
+    un.textContent=u?'　新語の割合はおよそ'+Math.round(lim/(u+lim)*100)+'％になります（復習'+u+'問＋新語'+lim+'語で1周・現在 '+Math.min(revCred(),u)+'/'+u+'問）。'
+      :'　1回ごとに新出を1割ずつ混ぜます。';}
   // リマインダー時刻のセレクトを初期化
   const rh=document.getElementById('rm-h'),rm=document.getElementById('rm-m');
   if(rh&&!rh.options.length){let o='';for(let i=0;i<24;i++)o+='<option value="'+i+'">'+('0'+i).slice(-2)+'時</option>';rh.innerHTML=o;}
