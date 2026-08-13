@@ -3550,9 +3550,11 @@ svg{display:block}
   <div class="set-row"><span class="set-lbl">間違えたとき</span><select class="set-sel" id="s-wrong" onchange="savePrefs()"><option value="reset">苦手に戻す（厳しい）</option><option value="down">1段階下げる（緩い）</option></select></div>
   <div style="font-size:11px;color:var(--ink4);padding:6px 14px 12px;line-height:1.6">連続で正解した回数が設定値に達すると「覚えた」と判定します。間違えると、設定に応じて苦手に戻すか1段階だけ下げます。回数を変更すると現在の判定も再計算されます。</div>
   <div class="set-row"><span class="set-lbl">復習を優先する目安</span><select class="set-sel" id="s-backlog" onchange="savePrefs()"><option value="1.5">1セッションの1.5倍</option><option value="2">2倍（推奨）</option><option value="3">3倍</option><option value="0">切り替えない</option></select></div>
-  <div style="font-size:11px;color:var(--ink4);padding:6px 14px 12px;line-height:1.6">復習の期限切れがこの語数を超えたら、新出の割合を3割から2割に絞って復習を優先します。1語覚えるたびに将来の復習が5回ほど発生するため、投入を続けると期限切れが増え続け、本来忘れる直前に出すはずだった語が手遅れになります。新出が完全に止まることはありません。<span id="s-backlog-now"></span></div>
+  <div style="font-size:11px;color:var(--ink4);padding:6px 14px 12px;line-height:1.6">復習の期限切れがこの語数を超えたら、新出を絞って復習を優先します。1語覚えるたびに将来の復習が5回ほど発生するため、投入を続けると期限切れが増え続け、本来忘れる直前に出すはずだった語が手遅れになります。新出が完全に止まることはありません。<span id="s-backlog-now"></span></div>
   <div class="set-row"><span class="set-lbl">新語のまとめ出し</span><select class="set-sel" id="s-unlock" onchange="savePrefs()"><option value="50">復習50問ごと</option><option value="100">復習100問ごと（推奨）</option><option value="200">復習200問ごと</option><option value="0">まとめず少しずつ混ぜる</option></select></div>
   <div style="font-size:11px;color:var(--ink4);padding:6px 14px 12px;line-height:1.6">復習を優先しているあいだ、ここで決めた問数の復習を終えるごとに、次の1回を新語だけのまとめ回にします。少しずつ混ぜるより区切りが分かりやすい反面、間隔が短いほど新語が増えて復習も増えます。<span id="s-unlock-now"></span></div>
+  <div class="set-row"><span class="set-lbl">回答の速さ</span><span class="set-val" id="s-rt">—</span></div>
+  <div style="font-size:11px;color:var(--ink4);padding:6px 14px 12px;line-height:1.6">「覚えた」に届いた語は、回答の速さでも間隔を調整します。自分の中央値の6割以下で答えられたら1.3倍に伸ばし、1.8倍より遅ければ0.8倍に抑えます。即答が3回続いた語は最長365日まで間引きます。当てずっぽうと区別できないので2択と習いたての語では見ません。形式ごとに10問たまると効きはじめます。</div>
   <div class="set-row"><span class="set-lbl">総単語数</span><span class="set-val" id="s-tot"></span></div>
   <div class="set-row"><span class="set-lbl">覚えた単語</span><span class="set-val" id="s-lnd"></span></div>
   <div class="set-row"><span class="set-lbl">連続学習日数</span><span class="set-val" id="s-str"></span></div>
@@ -3910,10 +3912,37 @@ const DAY=86400000;
 // 意味も綴りも定着したか（表示は「覚えた」のまま。降格させず、完了の印だけ足す）
 function isFull(id){const s=wSt[id];if(!s)return false;const T=masterT();return (s.nM||0)>=T&&(s.nF||0)>=T;}
 // テスト系の記録を更新する。kind: 'M'=意味（タイ語→日本語）/ 'F'=綴り（日本語→タイ語）
+// ── 回答の速さ ────────────────────────────────────────
+// 即答できる語は、連続正解数が同じでも記憶が強い。その差を間隔に反映する。
+// 絶対時間では測れない（タイプは4択より遅い、意味が長い語は読むのに時間がかかる）ので、
+// 形式ごとに自分の直近の中央値と比べる
+const RT_N=50;        // 中央値を取る母数
+const RT_MIN_N=10;    // これだけ溜まるまでは判定しない
+const RT_MIN_MS=300;  // 誤タップとみなす下限
+const RT_FAST=0.6, RT_SLOW=1.8;
+let qStart=0;// この問題を出した時刻
+function markQ(){qStart=Date.now();}
+function ansMs(){return qStart?Date.now()-qStart:null;}
+function rtPush(fmt,ms){const r=slog.rt=slog.rt||{};const a=r[fmt]=r[fmt]||[];a.push(ms);while(a.length>RT_N)a.shift();}
+function rtMed(fmt){
+  const a=(slog.rt&&slog.rt[fmt])||[];
+  if(a.length<RT_MIN_N)return null;
+  const b=a.slice().sort((x,y)=>x-y);
+  return b.length%2?b[(b.length-1)/2]:Math.round((b[b.length/2-1]+b[b.length/2])/2);
+}
+// 1=即答 / 0=ふつう（判断材料が足りないときも0） / -1=遅い正解
+function speedOf(ms,fmt){
+  if(ms==null||ms<RT_MIN_MS)return 0;
+  const m=rtMed(fmt);if(!m)return 0;
+  if(ms<=m*RT_FAST)return 1;
+  if(ms>=m*RT_SLOW)return -1;
+  return 0;
+}
 // 復習間隔はSM-2の簡易版。初回をあえて2日後にするのは、初回の取り出しを遅らせたほうが長期に残るため
 // weak=true は2択での正解。当てずっぽうでも50%当たるため昇格の根拠にはせず、
 // 「次は4択で確かめる」ための通過印(g2)だけ立てて翌日また出す
-function updSt(w,ok,kind,weak){
+// ms/fmt を渡すと回答の速さも間隔に効かせる（省略時は従来どおり）
+function updSt(w,ok,kind,weak,ms,fmt){
   const T=masterT();const cur=wSt[w.id]||{};const before=cur.status||STL[0];
   // 復習を何問こなしたか。まとめて新語を出すサイクルの進捗に使う（新出は数えない）。
   // 1回ぶん＋セッション1回のはみ出しで頭打ちにする。青天井にすると、
@@ -3927,18 +3956,28 @@ function updSt(w,ok,kind,weak){
       ivl:1,ease:cur.ease||2.3,last:Date.now(),due:Date.now()+DAY});
     recWord(w.id);save();return;
   }
+  // 速さを見るのは「すでに」覚えている語だけ。今回の正解で到達した語はまだ含めない
+  const mature=Math.max(nM,nF)>=T;
   const dec=v=>((pref.wrongMode||'reset')==='down')?Math.max(0,v-1):0;
   if(kind==='F')nF=ok?nF+1:dec(nF);
   else          nM=ok?nM+1:dec(nM);
   const succ=cur.rc||0;// これまでの正解回数（間隔の段階）
+  // 2択や習いたての語は、当てずっぽうの速タップと即答を区別できないので見ない
+  const spd=(ok&&mature&&!weak)?speedOf(ms,fmt):0;
+  if(ok&&fmt&&ms!=null&&ms>=RT_MIN_MS)rtPush(fmt,ms);// 基準は正解した回だけで作る
+  let fc=cur.fc||0;// 連続で即答した回数
+  fc=ok?(spd>0?fc+1:(spd<0?0:fc)):0;
   let ivl,ease=cur.ease||2.3;
   if(ok){
     // 2日 → 5日 → 前回×ease。ただし前回×ease を上回らせない。
     // 一度つまずいて1日に戻った語が、次の正解でいきなり5日に飛ぶのを防ぐ
     const grown=Math.max(2,Math.round((cur.ivl||2)*ease));
+    const sm=spd>0?1.3:(spd<0?0.8:1);// 即答なら伸ばし、遅い正解なら抑える
+    const wm=Math.max(0.7,1-0.06*Math.max(0,(cur.wc||0)-1));// つまずきが多い語は伸びを抑える（0〜1回は据え置き）
+    const cap=fc>=3?365:180;// 即答が続く語は年1回まで間引いてよい
     if(succ<=0)ivl=2;
     else if(succ===1)ivl=Math.min(5,grown);
-    else ivl=Math.min(180,grown);
+    else ivl=Math.min(cap,Math.max(2,Math.round(grown*sm*wm)));
     ease=Math.min(2.8,ease+0.05);
   }else{
     ivl=1;ease=Math.max(1.3,ease-0.25);
@@ -3949,7 +3988,7 @@ function updSt(w,ok,kind,weak){
   const newlyMastered=after===STL[3]&&before!==STL[3];// 新たに「覚えた」に到達
   if(newlyMastered)slog.todayLnd=(slog.todayLnd||0)+1;// 今日覚えた数をカウント
   wSt[w.id]={status:after,nM:nM,nF:nF,ivl:ivl,ease:ease,g2:ok?!!cur.g2:false,// 誤答で通過印は落とす
-    rc:(cur.rc||0)+(ok?1:0),wc:(cur.wc||0)+(ok?0:1),
+    fc:fc,rc:(cur.rc||0)+(ok?1:0),wc:(cur.wc||0)+(ok?0:1),
     last:Date.now(),due:Date.now()+ivl*DAY};
   recWord(w.id);save();
 }
@@ -4952,6 +4991,14 @@ function renderSettings(){
   if(bn){const lim=backlogLimit();
     bn.textContent=lim?'　今の設定では期限切れ'+lim+'語で復習優先に切り替わります（現在 '+dueWords().length+'語）。'
       :'　現在 '+dueWords().length+'語が期限切れです。';}
+  const rt=document.getElementById('s-rt');
+  if(rt){
+    const L={quiz:'4択',type:'タイプ',ex:'並替'};
+    rt.textContent=['quiz','type','ex'].map(f=>{
+      const m=rtMed(f),n=((slog.rt&&slog.rt[f])||[]).length;
+      return L[f]+' '+(m?(Math.round(m/100)/10)+'秒':(n?n+'/'+RT_MIN_N+'問':'—'));
+    }).join(' / ');
+  }
   document.getElementById('s-unlock').value=String(newUnlockN());
   const un=document.getElementById('s-unlock-now');
   if(un){const u=newUnlockN(),lim=cfg.limit||20;
@@ -5198,12 +5245,13 @@ function showQz(){
       if(ok){btn.style.background='var(--good-bg)';btn.querySelector('.quiz-opt-num').style.background='var(--good)';btn.querySelector('.quiz-opt-num').style.color='#fff';}
       else{btn.style.background='var(--bad-bg)';btn.querySelector('.quiz-opt-num').style.background='var(--bad)';btn.querySelector('.quiz-opt-num').style.color='#fff';
         Array.from(od.children).forEach(b=>{const sp=b.querySelector('span');if(sp&&sp.textContent===ct){b.style.background='var(--good-bg)';b.querySelector('.quiz-opt-num').style.background='var(--good)';b.querySelector('.quiz-opt-num').style.color='#fff';}});}
-      qSt[ok?'c':'w']++;updSt(w,ok,aT?'M':'F',od.children.length<=2);recAcc(ok);recStrk();if(!ok){badWs.push(w);requeueWrong(w);}updRvBnr(['rv-bar-qz']);
+      qSt[ok?'c':'w']++;updSt(w,ok,aT?'M':'F',od.children.length<=2,ansMs(),'quiz');recAcc(ok);recStrk();if(!ok){badWs.push(w);requeueWrong(w);}updRvBnr(['rv-bar-qz']);
       clearTimeout(tmrID);
       if(ok){if(aT)setTimeout(()=>{advance();},700);else advanceAfterSpeak(w.thai,'quiz',700);}// 日本語→タイ語は発音を聞いてから次へ
       else{armQzNext(od,ct);}};// 不正解時は正解をタップするまで進まない
     od.appendChild(btn);});
   requestAnimationFrame(()=>{fitWords(document.getElementById('qz-q'));fitFace(document.getElementById('qz-q'));});// タイ語1行・意味は枠内
+  markQ();// ここから解答までを測る
   startTmr('qz-tmr',()=>{if(!qAns){qAns=true;playWrong();const ct=aT?w.meaning:w.thai;
     Array.from(od.children).forEach(b=>{b.style.pointerEvents='none';const sp=b.querySelector('span');
       if(sp&&sp.textContent===ct){b.style.background='var(--good-bg)';const n=b.querySelector('.quiz-opt-num');if(n){n.style.background='var(--good)';n.style.color='#fff';}}});
@@ -5263,6 +5311,7 @@ function showType(){
   document.getElementById('tp-submit').style.display='';
   requestAnimationFrame(()=>{fitWords(document.getElementById('tp-q'));fitFace(document.getElementById('tp-q'));});// タイ語1行・意味は枠内
   setTimeout(()=>inp.focus(),200);
+  markQ();// ここから解答までを測る
 }
 function checkType(){
   if(idx>=words.length||tpAns)return;// 判定済みなら何もしない（連打で飛ばさない）
@@ -5273,7 +5322,7 @@ function checkType(){
   tpPrevSt=wSt[w.id]?Object.assign({},wSt[w.id]):null;// 「やっぱり正解」で戻せるよう判定前の記録を控える
   if(ok)playCorrect();else playWrong();
   inp.className='type-inp '+(ok?'ok':'ng');
-  tpSt[ok?'c':'w']++;updSt(w,ok,aT?'M':'F');recAcc(ok);recStrk();if(!ok){badWs.push(w);requeueWrong(w);}updRvBnr(['rv-bar-tp']);
+  tpSt[ok?'c':'w']++;updSt(w,ok,aT?'M':'F',false,ansMs(),'type');recAcc(ok);recStrk();if(!ok){badWs.push(w);requeueWrong(w);}updRvBnr(['rv-bar-tp']);
   // 正解・不正解どちらも答えを出す（意味が複数ある単語は他の意味も確認できる）
   inp.disabled=true;
   document.getElementById('tp-submit').style.display='none';
@@ -5349,6 +5398,7 @@ function showEx(){
   document.getElementById('arr-result-wrap').innerHTML='';
   document.getElementById('arr-actions').style.display='flex';
   // 並び替えモードでは開始時に音声は再生しない（答えのヒントになるため）
+  markQ();// ここから解答までを測る
   renderArrange();
 }
 
@@ -5412,7 +5462,7 @@ function arrCheck(){
     rw.innerHTML='<div class="arrange-result ng">惜しい！正しい順番は：<div class="arrange-correct">'+arrWords.join(' ')+'</div></div>';
   }
   // 習熟度更新（並び替えは例文の理解なので意味側に計上する）
-  qSt[ok?'c':'w']++;updSt(w,ok,'M');recAcc(ok);recStrk();if(!ok){badWs.push(w);requeueWrong(w);}
+  qSt[ok?'c':'w']++;updSt(w,ok,'M',false,ansMs(),'ex');recAcc(ok);recStrk();if(!ok){badWs.push(w);requeueWrong(w);}
   document.getElementById('arr-actions').style.display='none';
   // 例文の読み上げが終わってから次へ進む（結果を読む時間も確保）
   const minMs=ok?1100:2200;      // 最低これだけは結果を表示する
