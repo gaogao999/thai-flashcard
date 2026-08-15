@@ -4008,6 +4008,10 @@ function updSt(w,ok,kind,weak,ms,fmt){
   const gain=ok?gainOf(fmt,spd):0;
   if(kind==='F')nF=ok?r2(nF+gain):dec(nF);
   else          nM=ok?r2(nM+gain):dec(nM);
+  // 意味が仕上がっている語は、綴りで1回正解できた時点で綴りも満タンにする。
+  // 意味が未達の語には効かせない（方向を日→タイに固定したとき、初見の語が
+  // 1回の正解でいきなり「覚えた」になってしまうため）。2択は加算0なので元から対象外
+  if(ok&&kind==='F'&&nM>=T)nF=Math.max(nF,T);
   const succ=cur.rc||0;// これまでの正解回数（間隔の段階）
   // 上限を年1回まで緩めてよい「強い正解」。4択は即答、タイプ・並び替えは正解そのもの
   const strong=ok&&(fmt==='type'||fmt==='ex'||(fmt==='quiz'&&spd>0));
