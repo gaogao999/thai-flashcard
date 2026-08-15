@@ -3277,7 +3277,10 @@ svg{display:block}
 .d-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .d-row:last-child{margin-bottom:0}
 .d-lbl{width:58px;font-size:12px;font-weight:700;text-align:right;flex-shrink:0;white-space:nowrap}
-.d-bar{flex:1;background:var(--bg2);border-radius:3px;height:10px;overflow:hidden}
+.d-bar{flex:1;display:flex;background:var(--bg2);border-radius:3px;height:10px;overflow:hidden}
+.d-seg{height:10px;flex:none;transition:width .6s cubic-bezier(.2,.8,.3,1)}
+.d-lg{display:flex;gap:12px;flex-wrap:wrap;padding:0 16px 10px;font-size:10px;color:var(--ink3)}
+.d-lg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
 .d-bar-fill{height:10px;border-radius:3px;transition:width .6s cubic-bezier(.2,.8,.3,1)}
 .d-cnt{width:88px;font-size:10px;color:var(--ink3);text-align:right;flex-shrink:0;font-weight:600}
 .st-sum{display:flex;gap:1px;background:var(--bg2)}
@@ -3532,6 +3535,7 @@ svg{display:block}
   <div class="st-sum" id="st-sum"></div>
   <div id="st-full" style="font-size:11px;color:var(--ink4);padding:0 16px 4px;text-align:center"></div>
   <div style="font-size:12px;font-weight:700;color:var(--ink3);padding:14px 16px 8px;letter-spacing:.05em;border-bottom:1px solid var(--bg2)">レベル別</div>
+  <div class="d-lg" id="d-legend"></div>
   <div class="d-section" id="d-lv"></div>
   <div style="font-size:12px;font-weight:700;color:var(--ink3);padding:14px 16px 8px;letter-spacing:.05em;border-bottom:1px solid var(--bg2)">品詞別</div>
   <div class="d-section" id="d-pos"></div>
@@ -3688,6 +3692,8 @@ function assignLevels(ws){ws.forEach(w=>{w.level=scoreToLevel(w.score);});return
 const STL=['苦手','うろ覚え','ほぼ覚えた','覚えた'];
 const STC={'苦手':'var(--bad)','うろ覚え':'var(--warn)','ほぼ覚えた':'var(--blue)','覚えた':'var(--good)'};
 const STB={'苦手':'var(--bad-bg)','うろ覚え':'var(--warn-bg)','ほぼ覚えた':'var(--blue-bg)','覚えた':'var(--good-bg)'};
+// 帯の濃さ。「覚えた」を一番濃くし、段階が下がるほど薄くする（隣り合っても見分けられる）
+const STO={'苦手':'.35','うろ覚え':'.5','ほぼ覚えた':'.55','覚えた':'1'};
 const CHS=20;
 
 // ── ストレージ ──────────────────────────────────────────
@@ -4095,19 +4101,31 @@ function fireConfetti(){
     setTimeout(()=>c.remove(),3200);
   }
 }
-const totLnd=()=>Object.values(wSt).filter(x=>x.status==='覚えた').length;
 const byCnt=s=>Object.keys(wSt).filter(id=>getSt(id)===s).length;
-const revCnt=()=>Object.values(wSt).filter(x=>x.status==='苦手'||x.status==='うろ覚え').length;
+const totLnd=()=>byCnt(STL[3]);// 保存値ではなく getSt に合わせる（食い違い防止）
+const revCnt=()=>byCnt(STL[0])+byCnt(STL[1]);
 // 統計を1パスで集計（パフォーマンス最適化）
+// 段階ごとの内訳も一緒に数える。未学習（記録なし）はどの段階にも入れない
+const _blank=()=>{const o={tot:0,lnd:0,st:{}};STL.forEach(x=>o.st[x]=0);return o;};
 function computeLevelStats(){
-  const r={};LVS.forEach(lv=>r[lv]={tot:0,lnd:0});
-  for(const w of RAW){const lv=w.level;if(!r[lv])continue;r[lv].tot++;if(getSt(w.id)==='覚えた')r[lv].lnd++;}
+  const r={};LVS.forEach(lv=>r[lv]=_blank());
+  for(const w of RAW){const e=r[w.level];if(!e)continue;e.tot++;
+    if(wSt[w.id]){const st=getSt(w.id);e.st[st]=(e.st[st]||0)+1;if(st===STL[3])e.lnd++;}}
   return r;
 }
 function computePosStats(){
-  const r={};POS.forEach(p=>r[p]={tot:0,lnd:0});
-  for(const w of RAW){const p=w.pos;if(!r[p])r[p]={tot:0,lnd:0};r[p].tot++;if(getSt(w.id)==='覚えた')r[p].lnd++;}
+  const r={};POS.forEach(p=>r[p]=_blank());
+  for(const w of RAW){const e=r[w.pos]||(r[w.pos]=_blank());e.tot++;
+    if(wSt[w.id]){const st=getSt(w.id);e.st[st]=(e.st[st]||0)+1;if(st===STL[3])e.lnd++;}}
   return r;
+}
+// 段階を濃さで積み上げた1本の帯。覚えた→ほぼ覚えた→うろ覚え→苦手 の順に左から詰める
+function stackBar(e){
+  if(!e.tot)return '';
+  return [STL[3],STL[2],STL[1],STL[0]].map(x=>{
+    const c=e.st[x]||0;if(!c)return '';
+    return '<div class="d-seg" style="width:'+(c/e.tot*100)+'%;background:'+STC[x]+';opacity:'+STO[x]+'"></div>';
+  }).join('');
 }
 const isBM=id=>(pref.bm||(pref.bm=[])).includes(id);
 function togBM(id,el){if(!pref.bm)pref.bm=[];if(isBM(id))pref.bm=pref.bm.filter(x=>x!==id);else pref.bm.push(id);save();el.textContent=isBM(id)?'⭐':'☆';}
@@ -5622,12 +5640,16 @@ function renderDash(){
     if((s.nM||0)>=T2)onlyM++;else if((s.nF||0)>=T2)onlyF++;}
   const sf=document.getElementById('st-full');
   if(sf)sf.textContent='「覚えた」は意味と綴りの両方 '+totLnd().toLocaleString()+'語 ・ 「ほぼ覚えた」の内訳 意味だけ '+onlyM.toLocaleString()+'語／綴りだけ '+onlyF.toLocaleString()+'語';
+  const lg=document.getElementById('d-legend');
+  if(lg)lg.innerHTML=[STL[3],STL[2],STL[1],STL[0]].map(x=>
+    '<span><i style="background:'+STC[x]+';opacity:'+STO[x]+'"></i>'+x+'</span>').join('')
+    +'<span><i style="background:var(--bg2)"></i>未学習</span>';
   // レベル別
   const dLvStats=computeLevelStats();
   document.getElementById('d-lv').innerHTML=LVS.map((lv,i)=>{
     const t=dLvStats[lv].tot,d=dLvStats[lv].lnd;
     const p=t>0?Math.round(d/t*100):0;
-    return'<div class="d-row" style="'+(i===LVS.length-1?'margin-bottom:0':'')+'"><div class="d-lbl" style="color:'+LVC[lv]+'">'+lvL(lv)+'</div><div class="d-bar"><div class="d-bar-fill" style="width:'+p+'%;background:'+LVC[lv]+'"></div></div><div class="d-cnt">'+d+'/'+t+' ('+p+'%)</div></div>';
+    return'<div class="d-row" style="'+(i===LVS.length-1?'margin-bottom:0':'')+'"><div class="d-lbl" style="color:'+LVC[lv]+'">'+lvL(lv)+'</div><div class="d-bar">'+stackBar(dLvStats[lv])+'</div><div class="d-cnt">'+d+'/'+t+' ('+p+'%)</div></div>';
   }).join('');
   // 品詞別
   const posStats=computePosStats();
@@ -5635,19 +5657,23 @@ function renderDash(){
   document.getElementById('d-pos').innerHTML=pv.map((pos,i)=>{
     const t=posStats[pos].tot,d=posStats[pos].lnd;
     const p=Math.round(d/t*100);
-    return'<div class="d-row" style="'+(i===pv.length-1?'margin-bottom:0':'')+'"><div class="d-lbl">'+pos+'</div><div class="d-bar"><div class="d-bar-fill" style="width:'+p+'%;background:var(--accent)"></div></div><div class="d-cnt">'+d+'/'+t+' ('+p+'%)</div></div>';
+    return'<div class="d-row" style="'+(i===pv.length-1?'margin-bottom:0':'')+'"><div class="d-lbl">'+pos+'</div><div class="d-bar">'+stackBar(posStats[pos])+'</div><div class="d-cnt">'+d+'/'+t+' ('+p+'%)</div></div>';
   }).join('');
   // マトリクス（1パス集計）
   const mxStats={};
-  for(const w of RAW){const k=w.pos+'|'+w.level;if(!mxStats[k])mxStats[k]={t:0,d:0};mxStats[k].t++;if(getSt(w.id)==='覚えた')mxStats[k].d++;}
+  for(const w of RAW){const k=w.pos+'|'+w.level;if(!mxStats[k])mxStats[k]={t:0,d:0,n:0};mxStats[k].t++;
+    if(wSt[w.id]){const st=getSt(w.id);if(st===STL[3])mxStats[k].d++;else if(st===STL[2])mxStats[k].n++;}}
   const lvSh=lv=>(LVN[lv]||lv).replace('級','');// 短縮ラベル(5,4,3,準2,2,準1,1)
   let mx2='<table style="width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed"><tr><th style="width:38px;padding:4px 2px 4px 0;text-align:left;color:var(--ink4);font-weight:600;border-bottom:1px solid var(--bg2)"></th>';
   LVS.forEach(lv=>{mx2+='<th style="padding:4px 2px;text-align:center;color:'+LVC[lv]+';border-bottom:1px solid var(--bg2);font-weight:700">'+lvSh(lv)+'</th>';});mx2+='</tr>';
   pv.forEach(pos=>{
     mx2+='<tr><td style="padding:6px 4px 6px 0;color:var(--ink2);font-weight:600;border-bottom:1px solid var(--bg2);white-space:nowrap;font-size:12px">'+pos+'</td>';
-    LVS.forEach(lv=>{const s=mxStats[pos+'|'+lv]||{t:0,d:0};const t=s.t,d=s.d;
-      const p=t>0?Math.round(d/t*100):0;const bg=p===100?'var(--good-bg)':p>0?'var(--blue-bg)':'transparent';const col=p===100?'var(--good)':p>0?'var(--blue)':'var(--ink4)';
-      mx2+=t>0?'<td style="padding:5px 2px;text-align:center;background:'+bg+';border-bottom:1px solid var(--bg2)"><span style="color:'+col+';font-weight:700">'+p+'%</span><br><span style="color:var(--ink4);font-size:9px">'+d+'/'+t+'</span></td>'
+    LVS.forEach(lv=>{const s=mxStats[pos+'|'+lv]||{t:0,d:0,n:0};const t=s.t,d=s.d,nn=s.n||0;
+      const p=t>0?Math.round(d/t*100):0;
+      // 覚えた（濃）に加えて、ほぼ覚えた（薄）も背景の濃さで見えるようにする
+      const bg=p===100?'var(--good-bg)':d>0?'var(--good-bg)':nn>0?'var(--blue-bg)':'transparent';
+      const col=d>0?'var(--good)':nn>0?'var(--blue)':'var(--ink4)';
+      mx2+=t>0?'<td style="padding:5px 2px;text-align:center;background:'+bg+';border-bottom:1px solid var(--bg2);opacity:'+(d>0?1:nn>0?.75:1)+'"><span style="color:'+col+';font-weight:700">'+p+'%</span><br><span style="color:var(--ink4);font-size:9px">'+d+(nn?'+'+nn:'')+'/'+t+'</span></td>'
         :'<td style="padding:5px 2px;text-align:center;color:var(--bg2);border-bottom:1px solid var(--bg2)">–</td>';});mx2+='</tr>';});
   document.getElementById('d-mx').innerHTML=mx2+'</table>';
 }
