@@ -4002,7 +4002,7 @@ function updSt(w,ok,kind,weak,ms,fmt){
   if(nM==null)nM=(cur.n!=null)?cur.n:inferN(before,T);// 旧データからの引き継ぎ
   if(nF==null)nF=0;
   if(ok&&weak){
-    wSt[w.id]=Object.assign({},cur,{status:stOf(nM,nF,T),nM:nM,nF:nF,g2:true,
+    wSt[w.id]=Object.assign({},cur,{status:stOf(nM,nF,T),nM:nM,nF:nF,g2:true,fc:cur.fc||0,
       ivl:1,ease:cur.ease||2.3,last:Date.now(),due:Date.now()+DAY});
     recWord(w.id);save();return;
   }
@@ -4612,7 +4612,8 @@ function buildSession(limit){
   else               newQ=Math.min(fresh.length,Math.max(fresh.length?1:0,Math.ceil(limit*(focus?FOCUS_NEW:NORM_NEW))));
   const rev=batch?[]:due.slice(0,Math.max(0,limit-newQ));
   // 復習優先のときは決めた枠を超えて新出を足さない。
-  // 「苦手のみ」などで復習が少ししか取れないと、空いた分が全部新出になってしまうため
+  // 「苦手のみ」などで復習が少ししか取れないと、空いた分が全部新出になってしまうため。
+  // 通常時は残り枠を新出で埋める（復習が少ない日ほど新しい語を多く学ぶ）
   const room=Math.max(0,limit-rev.length);
   const add=fresh.slice(0,(focus&&!batch)?Math.min(newQ,room):room);
   // 復習優先のときは、まとめて復習してから新出を挟む（均等に混ぜるより消化の実感が出る）
@@ -4622,10 +4623,18 @@ function buildSession(limit){
   // まとめ回で新語が足りなかった場合も、残りは復習で埋める
   if(list.length<limit){
     const used=new Set(list.map(w=>w.id));
-    let fill=RAW.filter(w=>inF(w)&&!used.has(w.id)&&(!focus||(wSt[w.id]&&wSt[w.id].last)));
-    if(weakOnly)fill=fill.filter(isWeak);
-    fill.sort((a,b)=>((wSt[a.id]&&wSt[a.id].last)||0)-((wSt[b.id]&&wSt[b.id].last)||0));
-    list.push(...fill.slice(0,limit-list.length));
+    const nowT=Date.now();
+    const isDue=w=>{const s=wSt[w.id];return s&&s.due&&s.due<=nowT;};
+    // 期限切れの補充は本来の復習と同じ扱い（級・品詞で切らず、選んだ級以下→古い順）。
+    // 期限前の補充だけ級・品詞の範囲に従う。混ぜると期限順が崩れる
+    let dueFill=RAW.filter(w=>isDue(w)&&!used.has(w.id));
+    if(weakOnly)dueFill=dueFill.filter(isWeak);
+    dueFill.sort((a,b)=>{const pa=atOrBelow(a)?0:1,pb=atOrBelow(b)?0:1;
+      if(pa!==pb)return pa-pb;return wSt[a.id].due-wSt[b.id].due;});
+    let preFill=RAW.filter(w=>inF(w)&&!isDue(w)&&!used.has(w.id)&&(!focus||(wSt[w.id]&&wSt[w.id].last)));
+    if(weakOnly)preFill=preFill.filter(isWeak);
+    preFill.sort((a,b)=>((wSt[a.id]&&wSt[a.id].last)||0)-((wSt[b.id]&&wSt[b.id].last)||0));
+    list.push(...dueFill.concat(preFill).slice(0,limit-list.length));
   }
   return {list:list,rev:rev.length,add:add.length,dueTotal:due.length,focus:focus,batch:batch};
 }
