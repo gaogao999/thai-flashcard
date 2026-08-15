@@ -3554,7 +3554,7 @@ svg{display:block}
   <div class="set-row"><span class="set-lbl">新語のまとめ出し</span><select class="set-sel" id="s-unlock" onchange="savePrefs()"><option value="50">復習50問ごと</option><option value="100">復習100問ごと（推奨）</option><option value="200">復習200問ごと</option><option value="0">まとめず少しずつ混ぜる</option></select></div>
   <div style="font-size:11px;color:var(--ink4);padding:6px 14px 12px;line-height:1.6">復習を優先しているあいだ、ここで決めた問数の復習を終えるごとに、次の1回を新語だけのまとめ回にします。少しずつ混ぜるより区切りが分かりやすい反面、間隔が短いほど新語が増えて復習も増えます。<span id="s-unlock-now"></span></div>
   <div class="set-row"><span class="set-lbl">回答の速さ</span><span class="set-val" id="s-rt">—</span></div>
-  <div style="font-size:11px;color:var(--ink4);padding:6px 14px 12px;line-height:1.6">「覚えた」に届いた語は、回答の速さでも間隔を調整します。自分の中央値の6割以下で答えられたら1.3倍に伸ばし、1.8倍より遅ければ0.8倍に抑えます。即答が3回続いた語は最長365日まで間引きます。当てずっぽうと区別できないので2択と習いたての語では見ません。形式ごとに10問たまると効きはじめます。</div>
+  <div style="font-size:11px;color:var(--ink4);padding:6px 14px 12px;line-height:1.6">回答の速さを見るのは4択だけです。タイプや並び替えの所要時間は語の長さやタイル操作に左右され、記憶の強さを表さないためです。4択で自分の中央値の6割以下なら習熟度の加算を1.0（間隔1.3倍）、1.8倍より遅ければ0.5（間隔0.8倍）にします。強い正解が3回続いた語は最長365日まで間引きます。4択が10問たまると効きはじめます。</div>
   <div class="set-row"><span class="set-lbl">総単語数</span><span class="set-val" id="s-tot"></span></div>
   <div class="set-row"><span class="set-lbl">覚えた単語</span><span class="set-val" id="s-lnd"></span></div>
   <div class="set-row"><span class="set-lbl">連続学習日数</span><span class="set-val" id="s-str"></span></div>
@@ -3888,7 +3888,13 @@ function fitFace(box){
   let s=parseFloat(getComputedStyle(el).fontSize)||32,guard=0;
   while(s>13&&box.scrollHeight>box.clientHeight+1&&guard++<40){s-=1;el.style.fontSize=s+'px';el.style.lineHeight='1.3';}
 }
-const getSt=id=>{const v=wSt[id]&&wSt[id].status;return STL.includes(v)?v:STL[0];};// CSSクラス名に使うため既知の値に限定する
+// 段階は保存値ではなく nM/nF から毎回導く。保存値を読むと、出題方向や
+// 覚えた判定回数を変えたときに古い判定が残る。戻り値は CSS クラス名にも使うので既知の値に限定する
+const getSt=id=>{
+  const s=wSt[id];if(!s)return STL[0];
+  if(s.nM==null&&s.nF==null)return STL.includes(s.status)?s.status:STL[0];// 旧データ（nM 移行前）
+  return stOf(s.nM||0,s.nF||0,masterT());
+};
 const lvCls=lv=>LVS.includes(lv)?lv:LVS[0];// レベルも同様
 // ── 判定アルゴリズム（設定画面で変更可能）──
 // pref.masterN : 「覚えた」と判定する連続正解回数（1〜5・既定2）
@@ -3909,6 +3915,38 @@ function inferN(status,T){
   return 0;
 }
 const DAY=86400000;
+// 段階の判定。意味(nM)と綴り(nF)の両方がそろって初めて「覚えた」。
+// 片方だけ仕上がった状態を「ほぼ覚えた」に割り当てることで、四段階すべてが実際に使われる。
+// ただし出題方向を固定していると、もう片方は永遠に出題されない。
+// そのまま両方を要求すると正解し続けても「覚えた」に到達できない行き止まりになるので、
+// 固定しているときは鍛えている側だけで判定する
+function stOf(nM,nF,T){
+  const d=(typeof cfg!=='undefined')&&cfg&&cfg.dir;
+  const need=d==='thai'?[nM||0]:d==='jp'?[nF||0]:[nM||0,nF||0];
+  if(need.every(v=>v>=T))return STL[3];   // 覚えた
+  const mx=Math.max(nM||0,nF||0);
+  if(mx<=0)return STL[0];                 // 苦手
+  if(mx>=T)return STL[2];                 // ほぼ覚えた（片方は仕上がっている）
+  return STL[1];                          // うろ覚え
+}
+// 形式ごとの「1回の正解が示す記憶の強さ」。同じ1回でも証拠の重さが違う。
+// 2択は当てずっぽうで半分当たるので0、綴りを産出できるタイプが最も重い。
+// 濃淡を速さでつけるのは4択だけ。タイプと並び替えの所要時間は語の長さや
+// タイル操作の時間に左右されるので、速さの判定には使わない
+function gainOf(fmt,spd){
+  if(fmt==='type')return 1.5;
+  if(fmt==='ex')return 1;
+  if(fmt==='quiz')return spd>0?1:(spd<0?0.5:0.75);
+  return 1;// 形式が分からないときは従来どおり1段
+}
+// 形式ごとの間隔倍率。4択は速さ、タイプ・並び替えは形式の難しさで決める
+function ivlMulOf(fmt,spd){
+  if(fmt==='type')return 1.2;
+  if(fmt==='ex')return 1.1;
+  if(fmt==='quiz')return spd>0?1.3:(spd<0?0.8:1);
+  return 1;
+}
+const r2=v=>Math.round(v*100)/100;
 // 意味も綴りも定着したか（表示は「覚えた」のまま。降格させず、完了の印だけ足す）
 function isFull(id){const s=wSt[id];if(!s)return false;const T=masterT();return (s.nM||0)>=T&&(s.nF||0)>=T;}
 // テスト系の記録を更新する。kind: 'M'=意味（タイ語→日本語）/ 'F'=綴り（日本語→タイ語）
@@ -3952,27 +3990,30 @@ function updSt(w,ok,kind,weak,ms,fmt){
   if(nM==null)nM=(cur.n!=null)?cur.n:inferN(before,T);// 旧データからの引き継ぎ
   if(nF==null)nF=0;
   if(ok&&weak){
-    wSt[w.id]=Object.assign({},cur,{status:stFromN(Math.max(nM,nF),T),nM:nM,nF:nF,g2:true,
+    wSt[w.id]=Object.assign({},cur,{status:stOf(nM,nF,T),nM:nM,nF:nF,g2:true,
       ivl:1,ease:cur.ease||2.3,last:Date.now(),due:Date.now()+DAY});
     recWord(w.id);save();return;
   }
-  // 速さを見るのは「すでに」覚えている語だけ。今回の正解で到達した語はまだ含めない
+  // 速さを見るのは4択だけ（他の形式は所要時間が記憶の強さを表さない）
   const mature=Math.max(nM,nF)>=T;
+  const spd=(ok&&fmt==='quiz')?speedOf(ms,fmt):0;
+  if(ok&&fmt==='quiz'&&ms!=null&&ms>=RT_MIN_MS)rtPush(fmt,ms);// 基準は4択の正解だけで作る
   const dec=v=>((pref.wrongMode||'reset')==='down')?Math.max(0,v-1):0;
-  if(kind==='F')nF=ok?nF+1:dec(nF);
-  else          nM=ok?nM+1:dec(nM);
+  const gain=ok?gainOf(fmt,spd):0;
+  if(kind==='F')nF=ok?r2(nF+gain):dec(nF);
+  else          nM=ok?r2(nM+gain):dec(nM);
   const succ=cur.rc||0;// これまでの正解回数（間隔の段階）
-  // 2択や習いたての語は、当てずっぽうの速タップと即答を区別できないので見ない
-  const spd=(ok&&mature&&!weak)?speedOf(ms,fmt):0;
-  if(ok&&fmt&&ms!=null&&ms>=RT_MIN_MS)rtPush(fmt,ms);// 基準は正解した回だけで作る
-  let fc=cur.fc||0;// 連続で即答した回数
-  fc=ok?(spd>0?fc+1:(spd<0?0:fc)):0;
+  // 上限を年1回まで緩めてよい「強い正解」。4択は即答、タイプ・並び替えは正解そのもの
+  const strong=ok&&(fmt==='type'||fmt==='ex'||(fmt==='quiz'&&spd>0));
+  const hesitated=ok&&fmt==='quiz'&&spd<0;
+  let fc=cur.fc||0;
+  fc=ok?(strong?fc+1:(hesitated?0:fc)):0;
   let ivl,ease=cur.ease||2.3;
   if(ok){
     // 2日 → 5日 → 前回×ease。ただし前回×ease を上回らせない。
     // 一度つまずいて1日に戻った語が、次の正解でいきなり5日に飛ぶのを防ぐ
     const grown=Math.max(2,Math.round((cur.ivl||2)*ease));
-    const sm=spd>0?1.3:(spd<0?0.8:1);// 即答なら伸ばし、遅い正解なら抑える
+    const sm=mature?ivlMulOf(fmt,spd):1;// 覚えた段階に届いた語だけ形式・速さで調整する
     const wm=Math.max(0.7,1-0.06*Math.max(0,(cur.wc||0)-1));// つまずきが多い語は伸びを抑える（0〜1回は据え置き）
     const cap=fc>=3?365:180;// 即答が続く語は年1回まで間引いてよい
     if(succ<=0)ivl=2;
@@ -3984,7 +4025,7 @@ function updSt(w,ok,kind,weak,ms,fmt){
   }
   // 方向を固定すると片方の数しか増えないので、進んでいるほうで表示する。
   // 自動では意味→綴りの順に増えるため max は実質 nM と同じ
-  const after=stFromN(Math.max(nM,nF),T);
+  const after=stOf(nM,nF,T);
   const newlyMastered=after===STL[3]&&before!==STL[3];// 新たに「覚えた」に到達
   if(newlyMastered)slog.todayLnd=(slog.todayLnd||0)+1;// 今日覚えた数をカウント
   wSt[w.id]={status:after,nM:nM,nF:nF,ivl:ivl,ease:ease,g2:ok?!!cur.g2:false,// 誤答で通過印は落とす
@@ -4021,7 +4062,7 @@ function migrateSched(){
     const cur=wSt[it.id];
     slot=Math.max(slot,it.iv*cap);
     const day=slot/cap;slot++;
-    wSt[it.id]={status:cur.status||stFromN(it.n,T),nM:it.n,nF:0,ivl:it.iv,ease:2.3,
+    wSt[it.id]={status:stOf(it.n,0,T),nM:it.n,nF:0,ivl:it.iv,ease:2.3,
       rc:Math.max(0,it.n),wc:0,last:now,
       due:now+Math.round(day*DAY)};
   });
@@ -4030,7 +4071,7 @@ function migrateSched(){
 // 閾値変更時に全単語の状態を再計算
 function recomputeAllSt(){
   const T=masterT();
-  for(const id in wSt){const s=wSt[id];let n=s.nM;if(n==null)n=(s.n!=null)?s.n:inferN(s.status,T);s.nM=n;s.status=stFromN(Math.max(n,s.nF||0),T);}
+  for(const id in wSt){const s=wSt[id];let n=s.nM;if(n==null)n=(s.n!=null)?s.n:inferN(s.status,T);s.nM=n;s.status=stOf(n,s.nF||0,T);}
 }
 let _toastTimer=null;
 function showLevelUpToast(){
@@ -4055,7 +4096,7 @@ function fireConfetti(){
   }
 }
 const totLnd=()=>Object.values(wSt).filter(x=>x.status==='覚えた').length;
-const byCnt=s=>Object.values(wSt).filter(x=>x.status===s).length;
+const byCnt=s=>Object.keys(wSt).filter(id=>getSt(id)===s).length;
 const revCnt=()=>Object.values(wSt).filter(x=>x.status==='苦手'||x.status==='うろ覚え').length;
 // 統計を1パスで集計（パフォーマンス最適化）
 function computeLevelStats(){
@@ -4993,11 +5034,8 @@ function renderSettings(){
       :'　現在 '+dueWords().length+'語が期限切れです。';}
   const rt=document.getElementById('s-rt');
   if(rt){
-    const L={quiz:'4択',type:'タイプ',ex:'並替'};
-    rt.textContent=['quiz','type','ex'].map(f=>{
-      const m=rtMed(f),n=((slog.rt&&slog.rt[f])||[]).length;
-      return L[f]+' '+(m?(Math.round(m/100)/10)+'秒':(n?n+'/'+RT_MIN_N+'問':'—'));
-    }).join(' / ');
+    const m=rtMed('quiz'),n=((slog.rt&&slog.rt.quiz)||[]).length;
+    rt.textContent='4択の中央値 '+(m?(Math.round(m/100)/10)+'秒':(n?n+'/'+RT_MIN_N+'問':'—'));
   }
   document.getElementById('s-unlock').value=String(newUnlockN());
   const un=document.getElementById('s-unlock-now');
@@ -5522,8 +5560,7 @@ function showResult(){
     +'<div class="res-st-bar" style="text-align:left">'
     +'<div style="font-size:12px;font-weight:700;color:var(--ink3);margin-bottom:4px">現在の習熟度</div>'
     +'<div style="font-size:11px;color:var(--ink4);margin-bottom:12px">学習済み '+learnedIds.length.toLocaleString()+'語 ・ 未学習 '+untouched.toLocaleString()+'語</div>';
-  // 「ほぼ覚えた」は覚えた判定が3回以上のときしか存在しないので、そのときだけ出す
-  STL.filter(s=>s!==STL[2]||masterT()>=3).forEach(s=>{
+  STL.forEach(s=>{
     const cnt=stC[s],p=Math.round(cnt/stDen*100);
     h+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:12.5px">'
       +'<div style="width:72px;font-weight:700;color:'+STC[s]+'">'+s+'</div>'
@@ -5561,9 +5598,7 @@ function renderDash(){
     return'<div class="wk-bar-wrap"><div class="wk-cnt">'+d.cnt+'</div><div class="wk-bar'+(d.isToday?' today':'')+'" style="height:'+h+'%"></div><div class="wk-label">'+dd+'</div></div>';
   }).join('');
   // 習熟度
-  // 「ほぼ覚えた」は覚えた判定が3回以上のときしか存在しない（stFromN の分岐が T>=3 のみ）
-  document.getElementById('st-sum').innerHTML=STL.filter(s=>s!==STL[2]||masterT()>=3)
-    .map(s=>'<div class="st-sum-item" style="background:'+STB[s]+'"><div class="st-sum-n" style="color:'+STC[s]+'">'+byCnt(s)+'</div><div class="st-sum-l" style="color:'+STC[s]+'">'+s+'</div></div>').join('');
+  document.getElementById('st-sum').innerHTML=STL.map(s=>'<div class="st-sum-item" style="background:'+STB[s]+'"><div class="st-sum-n" style="color:'+STC[s]+'">'+byCnt(s)+'</div><div class="st-sum-l" style="color:'+STC[s]+'">'+s+'</div></div>').join('');
   // 復習の予定（今後7日 ＋ 期限切れ）
   const nowD=Date.now();const bk=[0,0,0,0,0,0,0,0];// [期限切れ, 1日後, 2日後, …, 7日後]
   let later=0,sched=0;
@@ -5580,10 +5615,13 @@ function renderDash(){
   dh+='<div style="font-size:11px;color:var(--ink4);margin-top:12px;line-height:1.6">復習予定のある単語 '+sched+'語'
     +(accP!=null?'　直近'+(slog.acc||[]).length+'問の正答率 '+accP+'%'+(accP>=92?'（易しすぎ→難度を上げています）':accP<78?'（難しすぎ→難度を下げています）':'（最適域）'):'')+'</div>';
   document.getElementById('d-due').innerHTML=dh;
-  // 「覚えた」のうち綴りも定着している数
-  const fullN=Object.keys(wSt).filter(id=>getSt(id)===STL[3]&&isFull(id)).length;// 「覚えた」の内数になるようにする
+  // 「ほぼ覚えた」の内訳。意味だけ／綴りだけ、どちらが残っているか
+  const T2=masterT();
+  let onlyM=0,onlyF=0;
+  for(const id in wSt){const s=wSt[id];if(getSt(id)!==STL[2])continue;
+    if((s.nM||0)>=T2)onlyM++;else if((s.nF||0)>=T2)onlyF++;}
   const sf=document.getElementById('st-full');
-  if(sf)sf.textContent='「覚えた」'+totLnd().toLocaleString()+'語 ・ うち綴りも定着 '+fullN.toLocaleString()+'語';
+  if(sf)sf.textContent='「覚えた」は意味と綴りの両方 '+totLnd().toLocaleString()+'語 ・ 「ほぼ覚えた」の内訳 意味だけ '+onlyM.toLocaleString()+'語／綴りだけ '+onlyF.toLocaleString()+'語';
   // レベル別
   const dLvStats=computeLevelStats();
   document.getElementById('d-lv').innerHTML=LVS.map((lv,i)=>{
