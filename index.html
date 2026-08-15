@@ -4958,7 +4958,7 @@ function renderDictList(res,q){
   const shown=res.slice(0,DICT_MAX);
   list.innerHTML=shown.map(w=>{
     const st=getSt(w.id);
-    const spk='<button class="dict-iconbtn" onclick="speak(\''+(w.thai||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L13 19V5L7.5 9.5z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg></button>';
+    const spk='<button class="dict-iconbtn" onclick="speak(\''+esc((w.thai||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'"))+'\')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L13 19V5L7.5 9.5z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg></button>';
     const bm='<button class="dict-iconbtn'+(isBM(w.id)?' on':'')+'" data-id="'+esc(w.id)+'" onclick="dictBM(this)">'+bmSvg(isBM(w.id))+'</button>';
     let ex='';
     ['ex1','ex2','ex3'].forEach(p=>{
@@ -5482,13 +5482,13 @@ function renderArrange(){
   const ans=document.getElementById('arr-answer');
   ans.className='arrange-answer'+(arrAnswer.length?' filled':'');
   ans.innerHTML=arrAnswer.map((wi,pos)=>
-    '<div class="aa-tile" onclick="arrRemove('+pos+')">'+arrWords[wi]+'</div>'
+    '<div class="aa-tile" onclick="arrRemove('+pos+')">'+esc(arrWords[wi])+'</div>'
   ).join('') || '<span style="color:var(--ink4);font-size:13px;align-self:center">タップして単語を追加</span>';
   // プール
   const pool=document.getElementById('arr-pool');
   pool.innerHTML=shuffled.map(wi=>{
     const used=arrAnswer.includes(wi);
-    return '<div class="ap-tile'+(used?' used':'')+'" onclick="arrAdd('+wi+')">'+arrWords[wi]+'</div>';
+    return '<div class="ap-tile'+(used?' used':'')+'" onclick="arrAdd('+wi+')">'+esc(arrWords[wi])+'</div>';
   }).join('');
 }
 
@@ -5527,7 +5527,7 @@ function arrCheck(){
   if(ok){
     rw.innerHTML='<div class="arrange-result ok">正解！</div>';
   }else{
-    rw.innerHTML='<div class="arrange-result ng">惜しい！正しい順番は：<div class="arrange-correct">'+arrWords.join(' ')+'</div></div>';
+    rw.innerHTML='<div class="arrange-result ng">惜しい！正しい順番は：<div class="arrange-correct">'+arrWords.map(esc).join(' ')+'</div></div>';
   }
   // 習熟度更新（並び替えは例文の理解なので意味側に計上する）
   qSt[ok?'c':'w']++;updSt(w,ok,'M',false,ansMs(),'ex');recAcc(ok);recStrk();if(!ok){badWs.push(w);requeueWrong(w);}
