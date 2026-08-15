@@ -5502,7 +5502,12 @@ function showResult(){
   const acc=tot>0?Math.round(cor/tot*100):0;
   const emoji=acc>=80?'<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#5E7A5A" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9" stroke-linecap="round" stroke-linejoin="round"/></svg>':acc>=50?'<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#BB5E3C" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9" stroke-linecap="round" stroke-linejoin="round"/></svg>':'<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#B5524A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8a7 7 0 0 1 12-3l2 2"/><path d="M17 4v3h-3"/><path d="M21 16a7 7 0 0 1-12 3l-2-2"/><path d="M7 20v-3h3"/></svg>';
   const msg=acc>=80?'すばらしい！':acc>=50?'いい調子！':'もう少し練習しよう';
-  const stC={};STL.forEach(s=>stC[s]=RAW.filter(w=>getSt(w.id)===s).length);
+  // 記録のある語だけを数える。未学習を「苦手」に混ぜると、
+  // 手をつけていない1万7千語まで苦手として並んでしまう
+  const learnedIds=Object.keys(wSt);
+  const stC={};STL.forEach(s=>stC[s]=learnedIds.filter(id=>getSt(id)===s).length);
+  const untouched=Math.max(0,RAW.length-learnedIds.length);
+  const stDen=Math.max(1,learnedIds.length);
   const retA=fromCh?'goChapters(\''+curLv+'\')':'switchTab(\'home\')';
   const retL=fromCh?'チャプター一覧に戻る':'ホームに戻る';
   let h='<div class="res-em">'+emoji+'</div>'
@@ -5515,12 +5520,15 @@ function showResult(){
     +'</div>'
     +nextRevHtml()
     +'<div class="res-st-bar" style="text-align:left">'
-    +'<div style="font-size:12px;font-weight:700;color:var(--ink3);margin-bottom:12px">現在の習熟度</div>';
-  STL.forEach(s=>{const cnt=stC[s];const p=RAW.length>0?Math.round(cnt/RAW.length*100):0;
+    +'<div style="font-size:12px;font-weight:700;color:var(--ink3);margin-bottom:4px">現在の習熟度</div>'
+    +'<div style="font-size:11px;color:var(--ink4);margin-bottom:12px">学習済み '+learnedIds.length.toLocaleString()+'語 ・ 未学習 '+untouched.toLocaleString()+'語</div>';
+  // 「ほぼ覚えた」は覚えた判定が3回以上のときしか存在しないので、そのときだけ出す
+  STL.filter(s=>s!==STL[2]||masterT()>=3).forEach(s=>{
+    const cnt=stC[s],p=Math.round(cnt/stDen*100);
     h+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:12.5px">'
       +'<div style="width:72px;font-weight:700;color:'+STC[s]+'">'+s+'</div>'
       +'<div style="flex:1;background:var(--bg2);border-radius:3px;height:8px;overflow:hidden"><div style="width:'+p+'%;height:8px;background:'+STC[s]+'"></div></div>'
-      +'<div style="width:36px;text-align:right;color:var(--ink3);font-size:11px">'+cnt+'語</div></div>';});
+      +'<div style="width:52px;text-align:right;color:var(--ink3);font-size:11px">'+cnt.toLocaleString()+'語</div></div>';});
   h+='</div><div class="res-acts"><button class="res-prim" onclick="'+retA+'">'+retL+'</button>';
   if(badWs.length+okWs.length>0)h+='<button class="res-sec" onclick="startReview()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-2px"><path d="M3 8a7 7 0 0 1 12-3l2 2"/><path d="M17 4v3h-3"/><path d="M21 16a7 7 0 0 1-12 3l-2-2"/><path d="M7 20v-3h3"/></svg> 苦手を復習（'+(badWs.length+okWs.length)+'件）</button>';
   h+='</div>';
@@ -5553,7 +5561,9 @@ function renderDash(){
     return'<div class="wk-bar-wrap"><div class="wk-cnt">'+d.cnt+'</div><div class="wk-bar'+(d.isToday?' today':'')+'" style="height:'+h+'%"></div><div class="wk-label">'+dd+'</div></div>';
   }).join('');
   // 習熟度
-  document.getElementById('st-sum').innerHTML=STL.map(s=>'<div class="st-sum-item" style="background:'+STB[s]+'"><div class="st-sum-n" style="color:'+STC[s]+'">'+byCnt(s)+'</div><div class="st-sum-l" style="color:'+STC[s]+'">'+s+'</div></div>').join('');
+  // 「ほぼ覚えた」は覚えた判定が3回以上のときしか存在しない（stFromN の分岐が T>=3 のみ）
+  document.getElementById('st-sum').innerHTML=STL.filter(s=>s!==STL[2]||masterT()>=3)
+    .map(s=>'<div class="st-sum-item" style="background:'+STB[s]+'"><div class="st-sum-n" style="color:'+STC[s]+'">'+byCnt(s)+'</div><div class="st-sum-l" style="color:'+STC[s]+'">'+s+'</div></div>').join('');
   // 復習の予定（今後7日 ＋ 期限切れ）
   const nowD=Date.now();const bk=[0,0,0,0,0,0,0,0];// [期限切れ, 1日後, 2日後, …, 7日後]
   let later=0,sched=0;
