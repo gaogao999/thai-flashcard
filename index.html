@@ -3554,6 +3554,8 @@ svg{display:block}
 <div id="scr-settings" style="display:none;flex-direction:column;width:100%;flex:1;padding-bottom:80px">
   <div class="set-row"><span class="set-lbl">1日の目標</span><select class="set-sel" id="s-goal" onchange="savePrefs()"><option value="10">10語</option><option value="20">20語</option><option value="50">50語</option><option value="100">100語</option></select></div>
   <div class="set-row"><span class="set-lbl">制限時間</span><select class="set-sel" id="s-tmr" onchange="savePrefs()"><option value="0">なし</option><option value="5">5秒</option><option value="10">10秒</option><option value="15">15秒</option><option value="30">30秒</option></select></div>
+  <div class="set-row"><span class="set-lbl">4択の制限時間</span><select class="set-sel" id="s-qtmr" onchange="savePrefs()"><option value="-1">上と同じ</option><option value="0">なし</option><option value="3">3秒</option><option value="5">5秒</option><option value="8">8秒</option><option value="10">10秒</option><option value="15">15秒</option></select></div>
+  <div style="font-size:11px;color:var(--ink4);padding:6px 14px 12px;line-height:1.6">4択だけ別の制限時間にできます。4択は素早く思い出せるかを見るテストなので、短め（3〜5秒）にすると効果的です。時間切れは不正解になります。「上と同じ」なら共通の制限時間に従います。</div>
   <div class="set-row"><span class="set-lbl">カタカナ読み</span><select class="set-sel" id="s-kana" onchange="savePrefs()"><option value="1">表示する</option><option value="0">表示しない</option></select></div>
   <div class="set-row"><span class="set-lbl">効果音（正解・不正解）</span><select class="set-sel" id="s-sfx" onchange="savePrefs()"><option value="1">オン</option><option value="0">オフ</option></select></div>
   <div class="set-row"><span class="set-lbl">「覚えた」までの連続正解</span><select class="set-sel" id="s-mastern" onchange="savePrefs()"><option value="1">1回</option><option value="2">2回</option><option value="3">3回</option><option value="4">4回</option><option value="5">5回</option></select></div>
@@ -5049,6 +5051,7 @@ function savePrefs(){
   const changed=pn!==(pref.masterN||2);
   pref.goal=parseInt(document.getElementById('s-goal').value);
   pref.timer=parseInt(document.getElementById('s-tmr').value);
+  {const v=parseInt(document.getElementById('s-qtmr').value);pref.quizTimer=(v<0)?null:v;}
   pref.masterN=pn;
   pref.wrongMode=document.getElementById('s-wrong').value;
   pref.showKana=document.getElementById('s-kana').value==='1';
@@ -5063,6 +5066,7 @@ function renderSettings(){
   document.getElementById('s-str').textContent=strk.cur+'日';document.getElementById('s-time').textContent=fmtT(slog.sec||0);
   document.getElementById('s-words').textContent=(slog.words||0).toLocaleString()+'語';document.getElementById('s-bm').textContent=(pref.bm||[]).length+'件';
   document.getElementById('s-goal').value=String(pref.goal||20);document.getElementById('s-tmr').value=String(pref.timer||0);
+  document.getElementById('s-qtmr').value=(pref.quizTimer==null)?'-1':String(pref.quizTimer);
   document.getElementById('s-mastern').value=String(pref.masterN||2);document.getElementById('s-wrong').value=pref.wrongMode||'reset';
   document.getElementById('s-kana').value=pref.showKana===false?'0':'1';
   document.getElementById('s-sfx').value=pref.sfx===false?'0':'1';
@@ -5123,8 +5127,10 @@ let badWs=[],okWs=[],qAns=false;
 let tmrID=null;
 
 // ── タイマー ─────────────────────────────────────────────
-function startTmr(barId,cb){
-  clearTimeout(tmrID);const s=pref.timer||0;
+// 4択だけ専用の制限時間。未設定(null)なら全モード共通の pref.timer に従う
+function quizTimerSec(){const v=pref.quizTimer;return (v===0||v===3||v===5||v===8||v===10||v===15)?v:(pref.timer||0);}
+function startTmr(barId,cb,secOverride){
+  clearTimeout(tmrID);const s=(secOverride!=null)?secOverride:(pref.timer||0);
   const bar=document.getElementById(barId);if(!bar)return;
   if(s<=0){bar.style.display='none';return;}
   bar.style.display='block';
@@ -5332,7 +5338,7 @@ function showQz(){
   startTmr('qz-tmr',()=>{if(!qAns){qAns=true;playWrong();const ct=aT?w.meaning:w.thai;
     Array.from(od.children).forEach(b=>{b.style.pointerEvents='none';const sp=b.querySelector('span');
       if(sp&&sp.textContent===ct){b.style.background='var(--good-bg)';const n=b.querySelector('.quiz-opt-num');if(n){n.style.background='var(--good)';n.style.color='#fff';}}});
-    qSt.w++;updSt(w,false,aT?'M':'F');recAcc(false);badWs.push(w);requeueWrong(w);updRvBnr(['rv-bar-qz']);armQzNext(od,ct);}});// 時間切れも正解をタップして次へ
+    qSt.w++;updSt(w,false,aT?'M':'F');recAcc(false);badWs.push(w);requeueWrong(w);updRvBnr(['rv-bar-qz']);armQzNext(od,ct);}},quizTimerSec());// 4択だけ専用の制限時間。時間切れも正解をタップして次へ
 }
 // 「わからない」= 不正解扱い。正解を表示して次へ
 function quizDontKnow(){
