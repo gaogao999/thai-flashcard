@@ -1,6 +1,6 @@
 // タイ語単語帳 Service Worker
 // バージョンを変えると自動更新される（更新時はこの数字を上げる）
-const CACHE_VERSION = 'thai-flashcard-v63';
+const CACHE_VERSION = 'thai-flashcard-v64';
 const ASSETS = [
   './',
   './index.html',

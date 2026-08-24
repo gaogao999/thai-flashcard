@@ -5539,27 +5539,18 @@ function arrCheck(){
   const correctSeq=arrWords.join('');
   const ok=userSeq===correctSeq;
   const rw=document.getElementById('arr-result-wrap');
+  // 「次へ」を押すまで進まない（読み上げは流すが、勝手に次へは行かない）
+  const nextBtn='<button class="tp-next" onclick="window._arrShuffled=null;advance()">次へ →</button>';
   if(ok){
-    rw.innerHTML='<div class="arrange-result ok">正解！</div>';
+    rw.innerHTML='<div class="arrange-result ok">正解！</div>'+nextBtn;
   }else{
-    rw.innerHTML='<div class="arrange-result ng">惜しい！正しい順番は：<div class="arrange-correct">'+arrWords.map(esc).join(' ')+'</div></div>';
+    rw.innerHTML='<div class="arrange-result ng">惜しい！正しい順番は：<div class="arrange-correct">'+arrWords.map(esc).join(' ')+'</div></div>'+nextBtn;
   }
   // 習熟度更新（並び替えは例文の理解なので意味側に計上する）
   qSt[ok?'c':'w']++;updSt(w,ok,'M',false,ansMs(),'ex');recAcc(ok);recStrk();if(!ok){badWs.push(w);requeueWrong(w);}
   document.getElementById('arr-actions').style.display='none';
-  // 例文の読み上げが終わってから次へ進む（結果を読む時間も確保）
-  const minMs=ok?1100:2200;      // 最低これだけは結果を表示する
-  const capMs=20000;             // 読み上げが終わらない場合の保険
-  const t0=Date.now();const myIdx=idx;
-  let moved=false,capID=null;
-  const go=()=>{
-    if(moved)return;moved=true;clearTimeout(capID);
-    // 待っている間に学習を抜けた／別の問題に移った場合は進めない
-    if(idx!==myIdx||document.getElementById('scr-ex').style.display==='none')return;
-    window._arrShuffled=null;advance();
-  };
-  capID=setTimeout(go,capMs);
-  speak(w.ex1_thai,()=>setTimeout(go,Math.max(400,minMs-(Date.now()-t0))));
+  // 例文を読み上げる（自動では次へ進まない）
+  speak(w.ex1_thai);
 }
 
 // このセッションで段階がどう動いたか。やった手応えが数字で見えないと続ける理由が伝わらない
