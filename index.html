@@ -3411,6 +3411,7 @@ svg{display:block}
     <div class="stat-item"><div class="stat-n" id="hs-tot">0</div><div class="stat-l">今日覚えた</div></div>
     <div class="stat-item"><div class="stat-n" id="hs-lnd" style="color:var(--good)">0</div><div class="stat-l">覚えた</div></div>
     <div class="stat-item"><div class="stat-n" id="hs-rev" style="color:var(--accent)">0</div><div class="stat-l">今日の復習</div></div>
+    <div class="stat-item"><div class="stat-n" id="hs-time" style="color:var(--warn)">0分</div><div class="stat-l">今日の学習</div></div>
   </div>
   <button class="home-start" onclick="goStudyAll()">
     <div><div style="font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px"><svg width="17" height="17" viewBox="0 0 24 24" fill="#fff"><path d="M8 5.5v13l11-6.5z"></path></svg>全単語を学習する</div><div class="home-start-sub" id="home-start-sub">全レベル・ランダム順</div></div>
@@ -3801,7 +3802,13 @@ function recWord(id){
     for(const k in slog.wkData){if(k<co)delete slog.wkData[k];}
   }
 }
-function saveSec(){const e=Math.round((Date.now()-_t0)/1000);if(e>0&&e<7200)slog.sec+=e;_t0=Date.now();ss('tap_slog',slog);}
+function saveSec(){const e=Math.round((Date.now()-_t0)/1000);if(e>0&&e<7200){slog.sec+=e;
+  // 日ごとの学習秒数も貯める（本日の学習時間の正確な集計に使う）
+  slog.secByDay=slog.secByDay||{};const t=localDay();slog.secByDay[t]=(slog.secByDay[t]||0)+e;}
+  _t0=Date.now();ss('tap_slog',slog);}
+// 今日の学習時間（保存済み＋いま計測中の分）
+function todaySec(){const t=localDay();const flushed=(slog.secByDay&&slog.secByDay[t])||0;
+  const live=Math.round((Date.now()-_t0)/1000);return flushed+(live>0&&live<7200?live:0);}
 const fmtT=s=>s<60?s+'秒':s<3600?Math.floor(s/60)+'分':Math.floor(s/3600)+'時間'+Math.floor((s%3600)/60)+'分';
 // ── 4択ダミー選択肢生成（同品詞+同レベル優先、苦手単語優先）──
 function pickDistractors(w, pool3, want){
@@ -5008,6 +5015,7 @@ function renderHome(){
   document.getElementById('hs-tot').textContent=slog.todayLnd||0;// 今日覚えた数
   document.getElementById('hs-lnd').textContent=lnd;
   document.getElementById('hs-rev').textContent=dueWords().length;// 復習の期限が来ている語数
+  {const el=document.getElementById('hs-time');if(el)el.textContent=fmtT(todaySec());}// 今日の学習時間
   document.getElementById('word-cnt').textContent=RAW.length;
   // 「全単語を学習する」ボタンのサブ表示を現在の設定に合わせる
   const hss=document.getElementById('home-start-sub');
@@ -5645,7 +5653,7 @@ function showResult(){
 
 // ── 進捗 ─────────────────────────────────────────────────
 function renderDash(){
-  const tdS=Math.round((Date.now()-_t0)/1000);
+  const tdS=todaySec();
   const items=[
     {l:'累計学習時間',v:fmtT(slog.sec||0),i:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 13V9"/><path d="M9 2h6"/></svg>'},{l:'本日の学習時間',v:fmtT(tdS),i:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M4 10h16M8 3v4M16 3v4"/></svg>'},
     {l:'累計学習語数',v:(slog.words||0).toLocaleString()+'語',i:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.5C10.5 5.2 8.5 4.8 6 5v13c2.5-.2 4.5.2 6 1.5"/><path d="M12 6.5C13.5 5.2 15.5 4.8 18 5v13c-2.5-.2-4.5.2-6 1.5z"/></svg>'},{l:'連続学習日数',v:strk.cur+'日',i:'<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c.5 3 3.2 4.4 3.2 7.6a3.2 3.2 0 1 1-6.4 0c0-1 .3-1.8.8-2.5.3 1 .9 1.4 1.5 1.4-.6-2 .2-4.4.9-6.5z"/></svg>'},
