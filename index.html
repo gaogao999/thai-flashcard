@@ -3753,7 +3753,7 @@ function calcStreak(){
   if(slog.todayDate!==t){slog.todayDate=t;slog.todayIds=[];slog.todayLnd=0;ss('tap_slog',slog);}
   strk.cur=calcStreak();
 })();
-let _t0=Date.now();
+let _t0=0;let _active=false;// _t0=計測起点(0=非計測)、_active=学習セッション中か
 
 function save(){if(idbOK)idbSet('tap_raw',RAW).catch(()=>{});else ss('tap_raw',RAW);ss('tap_st',wSt);ss('tap_pre',wPre);ss('tap_streak',strk);ss('tap_slog',slog);ss('tap_pref',pref);}
 // 同梱辞書の版。words.json更新時にこの数字を上げると既存利用者も最新版に更新される
@@ -3804,13 +3804,23 @@ function recWord(id){
     for(const k in slog.wkData){if(k<co)delete slog.wkData[k];}
   }
 }
-function saveSec(){const e=Math.round((Date.now()-_t0)/1000);if(e>0&&e<7200){slog.sec+=e;
-  // 日ごとの学習秒数も貯める（本日の学習時間の正確な集計に使う）
-  slog.secByDay=slog.secByDay||{};const t=localDay();slog.secByDay[t]=(slog.secByDay[t]||0)+e;}
-  _t0=Date.now();ss('tap_slog',slog);}
-// 今日の学習時間（保存済み＋いま計測中の分）
+// ── 学習時間の計測 ─────────────────────────────────────
+// 「アプリを開いていた時間」ではなく「実際に問題を解いていた時間」を数える。
+// ・_active（学習セッション中）のときだけ加算する。ホーム/辞書/進捗/設定では数えない
+// ・1問ごとに区切って確定し、間隔がIDLE_CAP秒を超えたぶんは離席とみなして頭打ちにする
+//   （難問をじっくり考える時間は数えるが、開いたまま放置した時間は数えない）
+const IDLE_CAP=120;// 1区間で数える上限秒。これを超える間隔は離席として切り捨てる
+// いままでの経過ぶん（離席ぶんを除く）を確定させ、起点を今にリセットする
+function bumpSec(){if(!_active||!_t0)return;const e=Math.round((Date.now()-_t0)/1000);_t0=Date.now();if(e<=0)return;const c=Math.min(e,IDLE_CAP);slog.sec+=c;slog.secByDay=slog.secByDay||{};const t=localDay();slog.secByDay[t]=(slog.secByDay[t]||0)+c;ss('tap_slog',slog);}
+// 学習セッションの計測を開始／終了する
+function startTiming(){_active=true;_t0=Date.now();}
+function stopTiming(){bumpSec();_active=false;_t0=0;}
+// 互換用（既存の呼び出し元向け）：計測中のぶんを確定する
+function saveSec(){bumpSec();}
+// 今日の学習時間（保存済み＋計測中の分。計測中でなければ加算なし）
 function todaySec(){const t=localDay();const flushed=(slog.secByDay&&slog.secByDay[t])||0;
-  const live=Math.round((Date.now()-_t0)/1000);return flushed+(live>0&&live<7200?live:0);}
+  if(!_active||!_t0)return flushed;const live=Math.round((Date.now()-_t0)/1000);
+  return flushed+Math.min(Math.max(live,0),IDLE_CAP);}
 const fmtT=s=>s<60?s+'秒':s<3600?Math.floor(s/60)+'分':Math.floor(s/3600)+'時間'+Math.floor((s%3600)/60)+'分';
 // ── 4択ダミー選択肢生成（同品詞+同レベル優先、苦手単語優先）──
 function pickDistractors(w, pool3, want){
@@ -4165,7 +4175,7 @@ function showScr(id){ALL_SCRS.forEach(s=>{const el=document.getElementById('scr-
 const STUDY_SCRS=['flip','quiz','type','ex','result'];
 
 function switchTab(t){
-  saveSec();stopSpeak();curTab=t;
+  stopTiming();stopSpeak();curTab=t;
   document.getElementById('hdr').style.display='';// メインヘッダーを表示に戻す
   ['home','study','dict','dash','settings'].forEach(x=>document.getElementById('nav-'+x)?.classList.toggle('active',x===t));
   showScr(t);
@@ -4177,6 +4187,7 @@ function switchTab(t){
   if(t==='home')renderHome();if(t==='dict')renderDict();if(t==='dash')renderDash();if(t==='settings')renderSettings();
 }
 function headerBack(){
+  stopTiming();// 学習を抜けたら計測も止める
   stopSpeak();// 学習を抜けたら読み上げも止める
   if(fromCh){goChapters(curLv);fromCh=false;return;}
   if(document.getElementById('scr-ch').style.display==='flex'){switchTab('home');return;}
@@ -4334,6 +4345,7 @@ function _start(wl,label,isCh){
   document.getElementById('tp-bar').style.width='0%';
   document.getElementById('ex-bar').style.width='0%';
   ['flip','quiz','type','ex'].forEach(m=>{const el=document.getElementById('rv-bar-'+m);if(el)el.style.display='none';});
+  startTiming();// ここから学習時間の計測を開始
   renderStudy();
 }
 // ── 出題ディスパッチ ─────────────────────────────────────
@@ -4413,6 +4425,7 @@ function askThai(w){
 function optCount(w){return cfg.mode==='auto'?planFor(w).opts:4;}
 // 現在の単語を、決めた形式の画面で描画する
 function renderStudy(){
+  bumpSec();// 1問ごとに経過を確定（離席ぶんは頭打ち）
   if(idx>=words.length){showResult();return;}
   const m=(cfg.mode==='auto')?planFor(words[idx]).fmt:cfg.mode;
   showScr(m==='flip'?'flip':m==='quiz'?'quiz':m==='type'?'type':'ex');
@@ -5128,7 +5141,7 @@ function addReminder(){
     rmSt('カレンダーに追加しました（毎日 '+pad(h)+':'+pad(m)+'）',true);
   }catch(err){rmSt('エラー: '+err.message,false);}
 }
-function resetAll(){if(!confirm('進捗をリセットしますか？'))return;wSt={};wPre={};badWs=[];okWs=[];strk={dates:[],best:0,cur:0};slog={sec:0,words:0,todayIds:[],todayLnd:0,todayDate:localDay(),wkData:{}};_t0=Date.now();save();renderSettings();renderHome();}
+function resetAll(){if(!confirm('進捗をリセットしますか？'))return;wSt={};wPre={};badWs=[];okWs=[];strk={dates:[],best:0,cur:0};slog={sec:0,words:0,todayIds:[],todayLnd:0,todayDate:localDay(),wkData:{},secByDay:{}};_t0=0;_active=false;save();renderSettings();renderHome();}
 
 // ── 学習状態 ────────────────────────────────────────────
 let words=[],idx=0,flipped=false;
@@ -5607,7 +5620,7 @@ function nextRevHtml(){
 }
 // ── 結果 ─────────────────────────────────────────────────
 function showResult(){
-  clearTimeout(tmrID);saveSec();recStrk();
+  clearTimeout(tmrID);stopTiming();recStrk();
   const tot=words.length,cor=qSt.c+tpSt.c+stats.good,wr=qSt.w+tpSt.w+stats.bad;
   const acc=tot>0?Math.round(cor/tot*100):0;
   const emoji=acc>=80?'<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#5E7A5A" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9" stroke-linecap="round" stroke-linejoin="round"/></svg>':acc>=50?'<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#BB5E3C" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9" stroke-linecap="round" stroke-linejoin="round"/></svg>':'<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#B5524A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8a7 7 0 0 1 12-3l2 2"/><path d="M17 4v3h-3"/><path d="M21 16a7 7 0 0 1-12 3l-2-2"/><path d="M7 20v-3h3"/></svg>';
@@ -5744,8 +5757,9 @@ function renderDash(){
 
 // ── 初期化 ──────────────────────────────────────────────
 if(speechSynthesis.onvoiceschanged!==undefined)speechSynthesis.onvoiceschanged=()=>{};
-window.addEventListener('beforeunload',saveSec);
-window.addEventListener('visibilitychange',()=>{if(document.hidden)saveSec();});
+window.addEventListener('beforeunload',bumpSec);
+// タブを隠したら計測を一時停止（隠れている間は数えない）。戻ったら起点をリセットして再開
+window.addEventListener('visibilitychange',()=>{if(document.hidden){bumpSec();_t0=0;}else if(_active){_t0=Date.now();}});
 // RAWをIndexedDBから読み込んでから起動
 bootRAW().then(()=>{
   migrateSched();// 旧データに復習予定を付与（期限は散らす）
