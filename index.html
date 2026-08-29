@@ -3534,8 +3534,10 @@ svg{display:block}
 <!-- 進捗 -->
 <div id="scr-dash" style="display:none;flex-direction:column;width:100%;flex:1;padding-bottom:80px" class="dash-wrap">
   <div class="d-grid" id="d-grid"></div>
-  <div style="font-size:12px;font-weight:700;color:var(--ink3);padding:14px 16px 8px;letter-spacing:.05em;border-bottom:1px solid var(--bg2)">直近7日間</div>
+  <div style="font-size:12px;font-weight:700;color:var(--ink3);padding:14px 16px 8px;letter-spacing:.05em;border-bottom:1px solid var(--bg2)">直近7日間の語数</div>
   <div class="wk-chart" id="wk-chart"></div>
+  <div style="font-size:12px;font-weight:700;color:var(--ink3);padding:14px 16px 8px;letter-spacing:.05em;border-bottom:1px solid var(--bg2)">直近7日間の学習時間</div>
+  <div class="wk-chart" id="wk-time-chart"></div>
   <div style="font-size:12px;font-weight:700;color:var(--ink3);padding:14px 16px 8px;letter-spacing:.05em;border-bottom:1px solid var(--bg2)">復習の予定</div>
   <div class="d-section" id="d-due"></div>
   <div style="font-size:12px;font-weight:700;color:var(--ink3);padding:14px 16px 8px;letter-spacing:.05em;border-bottom:1px solid var(--bg2)">習熟度</div>
@@ -5667,6 +5669,15 @@ function renderDash(){
   document.getElementById('wk-chart').innerHTML=days.map(d=>{
     const h=Math.round(d.cnt/mx*100);const dd=d.ds.slice(5).replace('-','/');
     return'<div class="wk-bar-wrap"><div class="wk-cnt">'+d.cnt+'</div><div class="wk-bar'+(d.isToday?' today':'')+'" style="height:'+h+'%"></div><div class="wk-label">'+dd+'</div></div>';
+  }).join('');
+  // 7日学習時間グラフ
+  const sbd=slog.secByDay||{};const tdKey=localDay();const tdate=new Date();const tdays=[];
+  for(let i=6;i>=0;i--){const d=new Date(tdate);d.setDate(d.getDate()-i);const ds=localDay(d);const sec=ds===tdKey?tdS:(sbd[ds]||0);tdays.push({ds,sec,isToday:i===0});}
+  const tmx=Math.max(...tdays.map(d=>d.sec),1);
+  document.getElementById('wk-time-chart').innerHTML=tdays.map(d=>{
+    const h=Math.round(d.sec/tmx*100);const dd=d.ds.slice(5).replace('-','/');
+    const lbl=d.sec>=3600?(d.sec/3600).toFixed(1)+'h':d.sec>=60?Math.round(d.sec/60)+'分':d.sec>0?d.sec+'秒':'';
+    return'<div class="wk-bar-wrap"><div class="wk-cnt">'+lbl+'</div><div class="wk-bar'+(d.isToday?' today':'')+'" style="height:'+h+'%"></div><div class="wk-label">'+dd+'</div></div>';
   }).join('');
   // 習熟度
   document.getElementById('st-sum').innerHTML=STL.map(s=>'<div class="st-sum-item" style="background:'+STB[s]+'"><div class="st-sum-n" style="color:'+STC[s]+'">'+byCnt(s)+'</div><div class="st-sum-l" style="color:'+STC[s]+'">'+s+'</div></div>').join('');
