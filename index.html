@@ -3210,10 +3210,12 @@ svg{display:block}
 /* ─ タイピング ─ */
 .type-area{padding:20px 16px;display:flex;flex-direction:column;flex:1;min-height:0;justify-content:center}
 .type-q{background:var(--bg);border:1px solid var(--bg2);border-radius:20px;padding:28px 24px;text-align:center;margin-bottom:14px;min-height:120px;max-height:44vh;flex:0 1 auto;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center}
-/* タイプ入力中（キーボード表示中）：入力枠を必ず見せる。復習バナーは隠し、上寄せにして問題文を縮める */
+/* キーボード表示中だけ：入力枠を必ず見せる。復習バナーと補助表示を隠し、問題カードを縮める（中央寄せは維持） */
 .type-kbd #rv-bar-tp{display:none!important}
-.type-kbd .type-area{justify-content:flex-start;padding-top:12px}
-.type-kbd .type-q{min-height:0;padding:16px 20px;margin-bottom:10px}
+.type-kbd .type-q{min-height:0;padding:14px 20px;margin-bottom:10px}
+.type-kbd .tp-hint{display:none}
+.type-kbd .type-q .spk{margin-top:6px!important}
+.type-kbd .word-sub{margin-top:2px}
 .type-inp{width:100%;padding:16px;border:2px solid var(--bg2);border-radius:14px;font-size:18px;font-weight:600;text-align:center;outline:none;font-family:inherit;background:var(--bg)}
 .type-inp:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,128,0,.12)}
 .type-inp.ok{border-color:var(--good);background:var(--good-bg)}
@@ -5409,12 +5411,12 @@ function showType(){
     document.getElementById('tp-q').innerHTML='<span class="lvbadge '+lvCls(w.level)+'">'+lvL(w.level)+'</span><span class="stbadge st-'+st+'">'+st+'</span>'
       +'<div class="word-main">'+esc(w.thai)+'</div>'+(showKana()?'<div class="word-sub">'+esc(w.kana)+'</div>':'')
       +spkBtn(w.thai,true)
-      +'<div style="font-size:12px;color:var(--ink3);margin-top:12px">日本語で意味を入力</div>';
+      +'<div class="tp-hint" style="font-size:12px;color:var(--ink3);margin-top:12px">日本語で意味を入力</div>';
     setTimeout(()=>speak(w.thai),300);
   }else{
     document.getElementById('tp-q').innerHTML='<span class="lvbadge '+lvCls(w.level)+'">'+lvL(w.level)+'</span><span class="stbadge st-'+st+'">'+st+'</span>'
       +'<div class="word-meaning">'+esc(w.meaning)+'</div>'
-      +'<div style="font-size:12px;color:var(--ink3);margin-top:10px">タイ語をローマ字で入力</div>';
+      +'<div class="tp-hint" style="font-size:12px;color:var(--ink3);margin-top:10px">タイ語をローマ字で入力</div>';
   }
   const inp=document.getElementById('tp-inp');inp.value='';inp.className='type-inp';inp.disabled=false;
   inp.placeholder=aT?'日本語で意味を入力':'タイ語をローマ字で入力';
@@ -5777,14 +5779,26 @@ window.addEventListener('visibilitychange',()=>{if(document.hidden){bumpSec();_t
 // iOSはキーボードを出すとページ全体を勝手にスクロールし、上の問題文が隠れる。
 // タイプ入力中だけ本文の高さを表示領域(visualViewport)に合わせ、スクロールを固定して防ぐ
 (function(){
-  const inp=document.getElementById('tp-inp');if(!inp)return;
-  const scr=document.getElementById('scr-type');
-  const vv=window.visualViewport;let kb=false;
-  function apply(){if(!kb)return;if(vv)document.body.style.height=vv.height+'px';document.body.style.overflow='hidden';if(scr)scr.classList.add('type-kbd');window.scrollTo(0,0);}
-  function clear(){document.body.style.height='';document.body.style.overflow='';if(scr)scr.classList.remove('type-kbd');}
-  inp.addEventListener('focus',()=>{kb=true;setTimeout(apply,50);setTimeout(apply,300);});
-  inp.addEventListener('blur',()=>{kb=false;clear();});
-  if(vv){vv.addEventListener('resize',apply);vv.addEventListener('scroll',apply);}
+  const inp=document.getElementById('tp-inp');const scr=document.getElementById('scr-type');
+  const vv=window.visualViewport;if(!vv||!inp||!scr)return;
+  // 「フォーカスの有無」ではなく「実際に表示領域が縮んだか」で判定する。
+  // iOSは自動フォーカスでもキーボードが出ないことがあり、フォーカス基準だと配置が毎回ブレるため
+  function sync(){
+    const shrunk=(window.innerHeight-vv.height)>120;// キーボードぶん縮んでいる
+    const typing=document.activeElement===inp;
+    if(shrunk&&typing){
+      // heightだけだと body{min-height:100dvh} に負けて縮まないので min-height も上書きする
+      document.body.style.height=vv.height+'px';document.body.style.minHeight=vv.height+'px';
+      document.body.style.overflow='hidden';
+      scr.classList.add('type-kbd');window.scrollTo(0,0);
+    }else{
+      document.body.style.height='';document.body.style.minHeight='';document.body.style.overflow='';
+      scr.classList.remove('type-kbd');
+    }
+  }
+  vv.addEventListener('resize',sync);vv.addEventListener('scroll',sync);
+  inp.addEventListener('focus',()=>setTimeout(sync,300));
+  inp.addEventListener('blur',()=>setTimeout(sync,100));
 })();
 // RAWをIndexedDBから読み込んでから起動
 bootRAW().then(()=>{
