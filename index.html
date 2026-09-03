@@ -5777,28 +5777,39 @@ window.addEventListener('beforeunload',bumpSec);
 window.addEventListener('visibilitychange',()=>{if(document.hidden){bumpSec();_t0=0;}else if(_active){_t0=Date.now();}});
 // ── タイプ入力時のキーボードずれ対策（iOS）─────────────────
 // iOSはキーボードを出すとページ全体を勝手にスクロールし、上の問題文が隠れる。
-// タイプ入力中だけ本文の高さを表示領域(visualViewport)に合わせ、スクロールを固定して防ぐ
+// キーボード中だけ本文の高さを表示領域(visualViewport)に合わせ、スクロールを封じて防ぐ。
+// 判定に innerHeight は使えない：ホーム画面に追加したPWAでは innerHeight も一緒に縮み、
+// 差が0になって検出できないため。キーボードが無いときの高さを基準に覚えて比べる
 (function(){
   const inp=document.getElementById('tp-inp');const scr=document.getElementById('scr-type');
   const vv=window.visualViewport;if(!vv||!inp||!scr)return;
-  // 「フォーカスの有無」ではなく「実際に表示領域が縮んだか」で判定する。
-  // iOSは自動フォーカスでもキーボードが出ないことがあり、フォーカス基準だと配置が毎回ブレるため
+  const H=document.documentElement,B=document.body;
+  let baseH=vv.height,kb=false;
+  function pin(h){
+    kb=true;
+    H.style.height=h+'px';H.style.overflow='hidden';
+    // heightだけだと body{min-height:100dvh} に負けて縮まないので min-height も上書きする
+    B.style.height=h+'px';B.style.minHeight=h+'px';B.style.overflow='hidden';
+    scr.classList.add('type-kbd');
+    if(window.scrollY!==0)window.scrollTo(0,0);
+  }
+  function unpin(){
+    kb=false;
+    H.style.height='';H.style.overflow='';
+    B.style.height='';B.style.minHeight='';B.style.overflow='';
+    scr.classList.remove('type-kbd');
+  }
   function sync(){
-    const shrunk=(window.innerHeight-vv.height)>120;// キーボードぶん縮んでいる
-    const typing=document.activeElement===inp;
-    if(shrunk&&typing){
-      // heightだけだと body{min-height:100dvh} に負けて縮まないので min-height も上書きする
-      document.body.style.height=vv.height+'px';document.body.style.minHeight=vv.height+'px';
-      document.body.style.overflow='hidden';
-      scr.classList.add('type-kbd');window.scrollTo(0,0);
-    }else{
-      document.body.style.height='';document.body.style.minHeight='';document.body.style.overflow='';
-      scr.classList.remove('type-kbd');
-    }
+    if(document.activeElement!==inp){if(kb)unpin();baseH=Math.max(baseH,vv.height);return;}
+    if(baseH-vv.height>120)pin(vv.height);// キーボードぶん縮んでいる
+    else if(kb)unpin();
   }
   vv.addEventListener('resize',sync);vv.addEventListener('scroll',sync);
-  inp.addEventListener('focus',()=>setTimeout(sync,300));
-  inp.addEventListener('blur',()=>setTimeout(sync,100));
+  // iOSが勝手にスクロールしたら即座に戻す
+  window.addEventListener('scroll',()=>{if(kb&&window.scrollY!==0)window.scrollTo(0,0);},{passive:true});
+  // キーボードの出現はアニメーションするので数回みる
+  inp.addEventListener('focus',()=>{setTimeout(sync,150);setTimeout(sync,400);setTimeout(sync,700);});
+  inp.addEventListener('blur',()=>{unpin();baseH=Math.max(baseH,vv.height);});
 })();
 // RAWをIndexedDBから読み込んでから起動
 bootRAW().then(()=>{
