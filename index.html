@@ -3259,7 +3259,7 @@ svg{display:block}
 .qkind.new{background:var(--good-bg);color:var(--good)}
 .due-row{display:flex;align-items:center;gap:10px;margin-bottom:9px;font-size:12.5px}
 .due-row:last-child{margin-bottom:0}
-.due-lbl{width:62px;color:var(--ink3);font-weight:600;flex-shrink:0}
+.due-lbl{width:86px;color:var(--ink3);font-weight:600;flex-shrink:0}
 .due-bar{flex:1;background:var(--bg2);border-radius:3px;height:9px;overflow:hidden}
 .due-fill{height:9px;border-radius:3px;background:var(--accent)}
 .due-cnt{width:48px;text-align:right;color:var(--ink2);font-weight:700}
@@ -5724,6 +5724,21 @@ function showResult(){
 }
 
 // ── 進捗 ─────────────────────────────────────────────────
+// 「復習の予定」の区切り。5日目からは実際の復習間隔のはしご（6→16→43→118→300日／上限450日）に
+// ±15%のゆらぎを見込んだ範囲で束ねる。1日刻みのままだと先の予定が全部「8日以降」に潰れて見えない
+const DUE_BK=[
+  {max:0,        lbl:'期限切れ',  c:'var(--bad)'},
+  {max:1,        lbl:'明日'},
+  {max:2,        lbl:'2日後'},
+  {max:3,        lbl:'3日後'},
+  {max:4,        lbl:'4日後'},
+  {max:7,        lbl:'5〜7日'},    // 6日の段
+  {max:19,       lbl:'8〜19日'},   // 16日の段（16×1.15を切り上げて19）
+  {max:50,       lbl:'20〜50日'},  // 43日の段
+  {max:136,      lbl:'2〜4か月'},  // 118日の段
+  {max:345,      lbl:'5〜11か月'}, // 300日の段
+  {max:Infinity, lbl:'1年以上',    c:'var(--ink4)'}
+];
 function renderDash(){
   const tdS=todaySec();
   const items=[
@@ -5752,17 +5767,16 @@ function renderDash(){
   // 習熟度
   document.getElementById('st-sum').innerHTML=STL.map(s=>'<div class="st-sum-item" style="background:'+STB[s]+'"><div class="st-sum-n" style="color:'+STC[s]+'">'+byCnt(s)+'</div><div class="st-sum-l" style="color:'+STC[s]+'">'+s+'</div></div>').join('');
   // 復習の予定（今後7日 ＋ 期限切れ）
-  const nowD=Date.now();const bk=[0,0,0,0,0,0,0,0];// [期限切れ, 1日後, 2日後, …, 7日後]
-  let later=0,sched=0;
+  const nowD=Date.now();const bk=DUE_BK.map(()=>0);
+  let sched=0;
   for(const id in wSt){const d=wSt[id]&&wSt[id].due;if(!d)continue;sched++;
     const diff=Math.ceil((d-nowD)/DAY);
-    if(diff<=0)bk[0]++;else if(diff<=7)bk[diff]++;else later++;}
-  const dueMax=Math.max(...bk,later,1);
-  const dueLbl=['期限切れ','明日','2日後','3日後','4日後','5日後','6日後','7日後'];
-  let dh=bk.map((c,i)=>'<div class="due-row"><div class="due-lbl">'+dueLbl[i]+'</div>'
+    let bi=DUE_BK.findIndex(x=>diff<=x.max);if(bi<0)bi=DUE_BK.length-1;
+    bk[bi]++;}
+  const dueMax=Math.max(...bk,1);
+  let dh=bk.map((c,i)=>'<div class="due-row"><div class="due-lbl">'+DUE_BK[i].lbl+'</div>'
     +'<div class="due-bar"><div class="due-fill" style="width:'+Math.round(c/dueMax*100)+'%'
-    +(i===0?';background:var(--bad)':'')+'"></div></div><div class="due-cnt">'+c+'語</div></div>').join('');
-  dh+='<div class="due-row"><div class="due-lbl">8日以降</div><div class="due-bar"><div class="due-fill" style="width:'+Math.round(later/dueMax*100)+'%;background:var(--ink4)"></div></div><div class="due-cnt">'+later+'語</div></div>';
+    +(DUE_BK[i].c?';background:'+DUE_BK[i].c:'')+'"></div></div><div class="due-cnt">'+c+'語</div></div>').join('');
   const accP=recentAcc();
   dh+='<div style="font-size:11px;color:var(--ink4);margin-top:12px;line-height:1.6">復習予定のある単語 '+sched+'語'
     +(accP!=null?'　直近'+(slog.acc||[]).length+'問の正答率 '+accP+'%'+(accP>=92?'（易しすぎ→難度を上げています）':accP<78?'（難しすぎ→難度を下げています）':'（最適域）'):'')+'</div>';
