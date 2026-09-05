@@ -4060,7 +4060,14 @@ function updSt(w,ok,kind,weak,ms,fmt){
   // 意味が未達の語には効かせない（方向を日→タイに固定したとき、初見の語が
   // 1回の正解でいきなり「覚えた」になってしまうため）。2択は加算0なので元から対象外
   if(ok&&kind==='F'&&nM>=T)nF=Math.max(nF,T);
-  const succ=cur.rc||0;// これまでの正解回数（間隔の段階）
+  // 旧データや復元したバックアップでは rc / ivl が欠けていることがある。そのまま rc=0 と
+  // みなすと「覚えた」語まで初回正解あつかいになり、300日の予定が6日へ巻き戻ってしまう。
+  // 履歴(last)がある語は、保存済みの予定日から間隔と段階を復元して引き継ぐ
+  const prevIvl=(cur.ivl!=null)?cur.ivl
+    :((cur.last&&cur.due)?Math.max(1,Math.round((cur.due-cur.last)/DAY)):null);
+  // 保存済みの間隔が示す段階。rcが欠けていても0に壊れていても、育った語を初回扱いに落とさない
+  const ivlStep=(prevIvl==null)?0:(prevIvl>=IVL_STEP2?2:(prevIvl>=IVL_STEP1?1:0));
+  const succ=Math.max(cur.rc||0,ivlStep);// これまでの正解回数（間隔の段階）
   // 上限を年1回まで緩めてよい「強い正解」。4択は即答、タイプ・並び替えは正解そのもの
   const strong=ok&&(fmt==='type'||fmt==='ex'||(fmt==='quiz'&&spd>0));
   const hesitated=ok&&fmt==='quiz'&&spd<0;
@@ -4070,7 +4077,7 @@ function updSt(w,ok,kind,weak,ms,fmt){
   if(ok){
     // 6日 → 16日 → 前回×ease。ただし前回×ease を上回らせない。
     // 一度つまずいて1日に戻った語が、次の正解でいきなり16日に飛ぶのを防ぐ
-    const grown=Math.max(2,Math.round((cur.ivl||2)*ease));
+    const grown=Math.max(2,Math.round((prevIvl||2)*ease));
     const sm=mature?ivlMulOf(fmt,spd):1;// 覚えた段階に届いた語だけ形式・速さで調整する
     const wm=Math.max(0.7,1-0.06*Math.max(0,(cur.wc||0)-1));// つまずきが多い語は伸びを抑える（0〜1回は据え置き）
     const cap=fc>=3?IVL_CAP_STRONG:IVL_CAP;// 即答が続く語はさらに長く間引いてよい
