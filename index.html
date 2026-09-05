@@ -3575,7 +3575,7 @@ svg{display:block}
   <div class="set-row"><span class="set-lbl">新語のまとめ出し</span><select class="set-sel" id="s-unlock" onchange="savePrefs()"><option value="50">復習50問ごと</option><option value="100">復習100問ごと（推奨）</option><option value="200">復習200問ごと</option><option value="0">まとめず少しずつ混ぜる</option></select></div>
   <div style="font-size:11px;color:var(--ink4);padding:6px 14px 12px;line-height:1.6">復習を優先しているあいだ、ここで決めた問数の復習を終えるごとに、次の1回を新語だけのまとめ回にします。少しずつ混ぜるより区切りが分かりやすい反面、間隔が短いほど新語が増えて復習も増えます。<span id="s-unlock-now"></span></div>
   <div class="set-row"><span class="set-lbl">回答の速さ</span><span class="set-val" id="s-rt">—</span></div>
-  <div style="font-size:11px;color:var(--ink4);padding:6px 14px 12px;line-height:1.6">回答の速さを見るのは4択だけです。タイプや並び替えの所要時間は語の長さやタイル操作に左右され、記憶の強さを表さないためです。4択で自分の中央値の6割以下なら習熟度の加算を1.0（間隔1.3倍）、1.8倍より遅ければ0.5（間隔0.8倍）にします。強い正解が3回続いた語は最長450日まで間引きます。4択が10問たまると効きはじめます。</div>
+  <div style="font-size:11px;color:var(--ink4);padding:6px 14px 12px;line-height:1.6">回答の速さを見るのは4択だけです。タイプや並び替えの所要時間は語の長さやタイル操作に左右され、記憶の強さを表さないためです。4択で自分の中央値の6割以下なら習熟度の加算を1.0（間隔1.3倍）、1.8倍より遅ければ0.5（間隔0.8倍）にします。タイプは4択と同じ扱い（加算1.0・間隔そのまま）です。強い正解（4択の即答・並び替えの正解）が3回続いた語は最長450日まで間引きます。4択が10問たまると効きはじめます。</div>
   <div class="set-row"><span class="set-lbl">総単語数</span><span class="set-val" id="s-tot"></span></div>
   <div class="set-row"><span class="set-lbl">覚えた単語</span><span class="set-val" id="s-lnd"></span></div>
   <div class="set-row"><span class="set-lbl">連続学習日数</span><span class="set-val" id="s-str"></span></div>
@@ -3973,14 +3973,14 @@ function stOf(nM,nF,T){
 // 濃淡を速さでつけるのは4択だけ。タイプと並び替えの所要時間は語の長さや
 // タイル操作の時間に左右されるので、速さの判定には使わない
 function gainOf(fmt,spd){
-  if(fmt==='type')return 1.5;
+  if(fmt==='type')return 1;// 4択と同等に揃える（産出ぶんの上乗せはしない）
   if(fmt==='ex')return 1;
   if(fmt==='quiz')return spd>0?1:(spd<0?0.5:0.75);
   return 1;// 形式が分からないときは従来どおり1段
 }
 // 形式ごとの間隔倍率。4択は速さ、タイプ・並び替えは形式の難しさで決める
 function ivlMulOf(fmt,spd){
-  if(fmt==='type')return 1.2;
+  if(fmt==='type')return 1;// 4択と同等に揃える（間隔の上乗せはしない）
   if(fmt==='ex')return 1.1;
   if(fmt==='quiz')return spd>0?1.3:(spd<0?0.8:1);
   return 1;
@@ -4068,8 +4068,9 @@ function updSt(w,ok,kind,weak,ms,fmt){
   // 保存済みの間隔が示す段階。rcが欠けていても0に壊れていても、育った語を初回扱いに落とさない
   const ivlStep=(prevIvl==null)?0:(prevIvl>=IVL_STEP2?2:(prevIvl>=IVL_STEP1?1:0));
   const succ=Math.max(cur.rc||0,ivlStep);// これまでの正解回数（間隔の段階）
-  // 上限を年1回まで緩めてよい「強い正解」。4択は即答、タイプ・並び替えは正解そのもの
-  const strong=ok&&(fmt==='type'||fmt==='ex'||(fmt==='quiz'&&spd>0));
+  // 上限を年1回まで緩めてよい「強い正解」。4択は即答、並び替えは正解そのもの。
+  // タイプは4択と同じ扱いに揃えたので自動では立てない
+  const strong=ok&&(fmt==='ex'||(fmt==='quiz'&&spd>0));
   const hesitated=ok&&fmt==='quiz'&&spd<0;
   let fc=cur.fc||0;
   fc=ok?(strong?fc+1:(hesitated?0:fc)):0;
