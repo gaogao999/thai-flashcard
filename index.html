@@ -4133,6 +4133,31 @@ function migrateSched(){
   });
   pref.schedV=SCHED_V;save();
 }
+// ── 巻き戻った復習予定の修復（rc/ivl 欠落バグの後始末）──────────────
+// rc や ivl が欠けた語は「初回正解」とみなされ、300日先だった予定まで6日へ潰されていた。
+// 元の間隔は上書きで失われているので、習熟度に対して明らかに短すぎる予定だけを
+// はしごの途中まで戻す。縮めることはせず、いきなり上限まで伸ばすこともしない
+// （残りは正解のたびに 43→118→300日 と自然に伸びる）
+const REPAIR_V=1;
+function repairIvl(){
+  if(pref.repairV===REPAIR_V)return 0;
+  const T=masterT();let n=0;
+  for(const id in wSt){
+    const s=wSt[id];if(!s||!s.last)continue;
+    const st=stOf(s.nM||0,s.nF||0,T);
+    let want,rc;
+    if(st===STL[3]){want=43;rc=3;}        // 覚えた
+    else if(st===STL[2]){want=16;rc=2;}   // ほぼ覚えた
+    else continue;                        // うろ覚え・苦手は触らない
+    if((s.ivl||0)>=want)continue;         // 既に十分先ならそのまま
+    s.ivl=want;s.rc=Math.max(s.rc||0,rc);
+    // 「本来こうなっていたはずの予定日」を last から引き直す（±15%で山を崩す）
+    s.due=s.last+Math.round(want*(0.85+Math.random()*0.30)*DAY);
+    n++;
+  }
+  pref.repairV=REPAIR_V;save();
+  return n;
+}
 // 閾値変更時に全単語の状態を再計算
 function recomputeAllSt(){
   const T=masterT();
@@ -4841,6 +4866,7 @@ function importMD(e){
       if(data.slog&&typeof data.slog==='object')slog=data.slog;
       if(data.pref&&typeof data.pref==='object')pref=data.pref;
       migrateSched();// 旧バックアップには復習予定が無いので付与する
+      pref.repairV=0;repairIvl();// 復元データも巻き戻りを含みうるので直す
       save();
       const wc=document.getElementById('word-cnt');if(wc)wc.textContent=RAW.length;
       bkSt('復元しました（'+RAW.length+'件）',true);
@@ -5830,6 +5856,7 @@ window.addEventListener('visibilitychange',()=>{if(document.hidden){bumpSec();_t
 // RAWをIndexedDBから読み込んでから起動
 bootRAW().then(()=>{
   migrateSched();// 旧データに復習予定を付与（期限は散らす）
+  repairIvl();// 6日へ巻き戻された「覚えた」語の復習予定を戻す（1回だけ）
   if(!pref.onboarded){document.getElementById('ob-ov').style.display='flex';}
   else{switchTab('home');}
 });
