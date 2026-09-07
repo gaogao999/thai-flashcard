@@ -3829,8 +3829,55 @@ function todaySec(){const t=localDay();const flushed=(slog.secByDay&&slog.secByD
   return flushed+Math.min(Math.max(live,0),IDLE_CAP);}
 const fmtT=s=>s<60?s+'秒':s<3600?Math.floor(s/60)+'分':Math.floor(s/3600)+'時間'+Math.floor((s%3600)/60)+'分';
 // ── 4択ダミー選択肢生成（同品詞+同レベル優先、苦手単語優先）──
-function pickDistractors(w, pool3, want){
+// タイ文字の編集距離（何文字直せば一致するか）。語が短いので素直な実装で十分速い
+function levThai(a,b){
+  if(a===b)return 0;
+  if(a.length<b.length){const t=a;a=b;b=t;}
+  let prev=[];for(let j=0;j<=b.length;j++)prev[j]=j;
+  for(let i=1;i<=a.length;i++){
+    const cur=[i];
+    for(let j=1;j<=b.length;j++){
+      cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));
+    }
+    prev=cur;
+  }
+  return prev[b.length];
+}
+// 綴りが最も近い語を誤答候補にする（日本語→タイ語のとき用）。
+// 形が違いすぎる誤答は文字を読まなくても消去できてしまうので、
+// 声調記号や子音1つだけ違う語をぶつけて、1文字ずつ照合させる。
+// 同じ語で毎回まったく同じ誤答が出ないよう、近い順の上位から選ぶ
+const NEAR_POOL=8;
+function nearThai(w,n){
+  const t=w.thai||'';if(!t)return [];
+  const skipTx=new Set([w.meaning,w.thai]);
+  const scored=[];
+  for(const x of RAW){
+    if(x.id===w.id)continue;
+    const s=x.thai||'';
+    if(!s||Math.abs(s.length-t.length)>2)continue;
+    if(skipTx.has(s)||skipTx.has(x.meaning))continue;
+    const d=levThai(t,s);
+    if(d>0)scored.push({x:x,d:d});
+  }
+  scored.sort((a,b)=>a.d-b.d||Math.abs(a.x.thai.length-t.length)-Math.abs(b.x.thai.length-t.length));
+  const top=scored.slice(0,Math.max(n,NEAR_POOL));
+  const out=[];const usedTx=new Set(skipTx);
+  for(const o of shuf(top)){
+    if(out.length>=n)break;
+    if(usedTx.has(o.x.thai)||usedTx.has(o.x.meaning))continue;
+    out.push(o.x);usedTx.add(o.x.thai);usedTx.add(o.x.meaning);
+  }
+  return out;
+}
+function pickDistractors(w, pool3, want, aT){
   const N=Math.max(1,(want||4)-1);// 必要なダミーの数
+  // 日本語→タイ語は選択肢がタイ文字なので、綴りが近い語をぶつけて難しくする。
+  // タイ語→日本語は選択肢が日本語の意味なので、綴りの近さは効かない（従来どおり）
+  if(aT===false){
+    const near=nearThai(w,N);
+    if(near.length>=N)return near;
+  }
   // 優先度1: 同品詞 + 同レベル + 苦手/うろ覚え（最も引っかかりやすい）
   const p1 = pool3.filter(x => x.level===w.level && (getSt(x.id)==='苦手'||getSt(x.id)==='うろ覚え'));
   // 優先度2: 同品詞 + 同レベル
@@ -5396,7 +5443,7 @@ function showQz(){
       +'<div class="word-meaning">'+esc(w.meaning)+'</div><span class="pos-badge">'+esc(w.pos)+'</span>'+bmBtn;
   }
   const pool=RAW.filter(x=>x.id!==w.id&&x.pos===w.pos);
-  const opts=shuf([w,...pickDistractors(w, pool, optCount(w))]);
+  const opts=shuf([w,...pickDistractors(w, pool, optCount(w), aT)]);
   const od=document.getElementById('qz-opts');od.innerHTML='';
   opts.forEach((o,ni)=>{
     const btn=document.createElement('button');btn.className='quiz-opt';
