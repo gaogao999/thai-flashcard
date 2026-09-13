@@ -3978,8 +3978,13 @@ function fitFace(box){
 // 覚えた判定回数を変えたときに古い判定が残る。戻り値は CSS クラス名にも使うので既知の値に限定する
 const getSt=id=>{
   const s=wSt[id];if(!s)return STL[0];
-  if(s.nM==null&&s.nF==null)return STL.includes(s.status)?s.status:STL[0];// 旧データ（nM 移行前）
-  return stOf(s.nM||0,s.nF||0,masterT());
+  const T=masterT();
+  // 旧データ（nM/nF 移行前）も保存値をそのまま返さず、同じ式に通して判定する。
+  // 保存値を返していると、閾値変更で recomputeAllSt が走って移行された瞬間に
+  // 集計が飛ぶ（覚えた 773→733 語）。移行の前後で同じ数字になるようにする
+  if(s.nM==null&&s.nF==null)
+    return stOf(inferN(STL.includes(s.status)?s.status:STL[0],T),0,T);
+  return stOf(s.nM||0,s.nF||0,T);
 };
 const lvCls=lv=>LVS.includes(lv)?lv:LVS[0];// レベルも同様
 // ── 判定アルゴリズム（設定画面で変更可能）──
@@ -4205,7 +4210,9 @@ function repairIvl(){
 // 閾値変更時に全単語の状態を再計算
 function recomputeAllSt(){
   const T=masterT();
-  for(const id in wSt){const s=wSt[id];let n=s.nM;if(n==null)n=(s.n!=null)?s.n:inferN(s.status,T);s.nM=n;s.status=stOf(n,s.nF||0,T);}
+  // nF も明示的に埋める。片方だけ残すと「移行前」と見分けがつかない中途半端な記録になる
+  for(const id in wSt){const s=wSt[id];let n=s.nM;if(n==null)n=(s.n!=null)?s.n:inferN(s.status,T);
+    s.nM=n;s.nF=s.nF||0;s.status=stOf(n,s.nF,T);}
 }
 let _toastTimer=null;
 function showLevelUpToast(){
