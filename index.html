@@ -3582,6 +3582,9 @@ svg{display:block}
   <div class="set-row"><span class="set-lbl">累計学習時間</span><span class="set-val" id="s-time"></span></div>
   <div class="set-row"><span class="set-lbl">累計学習語数</span><span class="set-val" id="s-words"></span></div>
   <div class="set-row"><span class="set-lbl">ブックマーク</span><span class="set-val" id="s-bm"></span></div>
+  <div class="set-row"><span class="set-lbl">バージョン</span><span class="set-val" id="s-ver">—</span></div>
+  <div class="set-row" style="cursor:pointer" onclick="forceUpdate(this)"><span class="set-lbl">更新を確認</span><span class="set-val" id="s-upd">›</span></div>
+  <div style="font-size:11px;color:var(--ink4);padding:6px 14px 12px;line-height:1.6">最新版が反映されないときに押してください。キャッシュを消して読み込み直します（学習の記録は消えません）。</div>
   <div class="set-row" style="cursor:pointer" onclick="resetAll()"><span class="set-lbl set-del">進捗をリセット</span><span class="set-val">›</span></div>
   <div class="csv-area"><label class="csv-btn" for="csv-in2"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-2px;margin-right:6px"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>別のCSVを読み込む</label><input type="file" id="csv-in2" accept=".csv" style="display:none" onchange="loadCSV(event)"></div>
   <div class="csv-area" style="border-top:none;padding-top:0">
@@ -3956,6 +3959,7 @@ function playWrong(){if(pref.sfx===false)return;_initSnd();try{_sndW.currentTime
 // 発音ボタン（onclick内のタイ語をJS文字列として安全にエスケープ）
 function spkBtn(thai,mt){return '<button class="spk" onclick="speak(\''+esc((thai||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'"))+'\')"'+(mt?' style="margin-top:12px"':'')+'><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L13 19V5L7.5 9.5z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg></button>';}
 const lvL=lv=>LVN[lv]||lv;
+const APP_VER='v82';// 表示用。sw.js の CACHE_VERSION と必ず揃えること
 const showKana=()=>pref.showKana!==false;// カタカナ読みを表示するか（既定:表示）
 // タイ語(.word-main)が長い場合、1行に収まるようフォントを自動縮小（折り返し防止）
 function fitWords(scope){
@@ -5193,6 +5197,7 @@ function savePrefs(){
   save();renderHome();renderSettings();
 }
 function renderSettings(){
+  {const v=document.getElementById('s-ver');if(v)v.textContent=APP_VER;}
   document.getElementById('s-tot').textContent=RAW.length+'件';document.getElementById('s-lnd').textContent=totLnd()+'件';
   document.getElementById('s-str').textContent=strk.cur+'日';document.getElementById('s-time').textContent=fmtT(slog.sec||0);
   document.getElementById('s-words').textContent=(slog.words||0).toLocaleString()+'語';document.getElementById('s-bm').textContent=(pref.bm||[]).length+'件';
@@ -5248,6 +5253,23 @@ function addReminder(){
     setTimeout(()=>URL.revokeObjectURL(url),1000);
     rmSt('カレンダーに追加しました（毎日 '+pad(h)+':'+pad(m)+'）',true);
   }catch(err){rmSt('エラー: '+err.message,false);}
+}
+// 最新版が届かないとき用の手動更新。キャッシュを消してSWを入れ替え、読み込み直す。
+// 学習の記録は localStorage / IndexedDB にあるので消えない
+function forceUpdate(row){
+  const lbl=document.getElementById('s-upd');if(lbl)lbl.textContent='確認中…';
+  const done=()=>location.reload();
+  (async()=>{
+    try{
+      if('serviceWorker' in navigator){
+        const rs=await navigator.serviceWorker.getRegistrations();
+        for(const r of rs){if(r.waiting&&r.waiting.postMessage)r.waiting.postMessage('skipWaiting');
+          try{await r.update();}catch(e){}}
+      }
+      if(window.caches){for(const k of await caches.keys())await caches.delete(k);}
+    }catch(e){}
+    setTimeout(done,300);
+  })();
 }
 function resetAll(){if(!confirm('進捗をリセットしますか？'))return;wSt={};wPre={};badWs=[];okWs=[];strk={dates:[],best:0,cur:0};slog={sec:0,words:0,todayIds:[],todayLnd:0,todayDate:localDay(),wkData:{},secByDay:{}};_t0=0;_active=false;save();renderSettings();renderHome();}
 
