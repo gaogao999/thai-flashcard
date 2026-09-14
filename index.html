@@ -3317,6 +3317,9 @@ svg{display:block}
 .rut-ov{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;display:flex;align-items:flex-end;justify-content:center}
 .rut-sheet{width:100%;max-width:480px;background:var(--bg);border-radius:20px 20px 0 0;padding:20px 20px calc(20px + env(safe-area-inset-bottom));max-height:90vh;overflow-y:auto;animation:slideUp .25s}
 
+.tp-badges{display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap}
+.tp-badges .stbadge{margin-left:0}
+.tp-pos{background:var(--bg2);color:var(--ink2)}
 .pos-badge{font-size:11px;white-space:nowrap;padding:3px 9px;border-radius:20px;background:var(--bg2);color:var(--ink2);display:inline-block;margin-bottom:12px;font-weight:600}
 .empty{padding:48px 24px;text-align:center;color:var(--ink3);font-size:14px}
 
@@ -3959,7 +3962,7 @@ function playWrong(){if(pref.sfx===false)return;_initSnd();try{_sndW.currentTime
 // 発音ボタン（onclick内のタイ語をJS文字列として安全にエスケープ）
 function spkBtn(thai,mt){return '<button class="spk" onclick="speak(\''+esc((thai||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'"))+'\')"'+(mt?' style="margin-top:12px"':'')+'><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L13 19V5L7.5 9.5z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg></button>';}
 const lvL=lv=>LVN[lv]||lv;
-const APP_VER='v82';// 表示用。sw.js の CACHE_VERSION と必ず揃えること
+const APP_VER='v83';// 表示用。sw.js の CACHE_VERSION と必ず揃えること
 const showKana=()=>pref.showKana!==false;// カタカナ読みを表示するか（既定:表示）
 // タイ語(.word-main)が長い場合、1行に収まるようフォントを自動縮小（折り返し防止）
 function fitWords(scope){
@@ -5523,14 +5526,17 @@ function showType(){
   updProg('tp-bar','tp-prog');updRvBnr(['rv-bar-tp']);
   const aT=askThai(w);const st=getSt(w.id);
   if(aT){
-    document.getElementById('tp-q').innerHTML='<span class="lvbadge '+lvCls(w.level)+'">'+lvL(w.level)+'</span><span class="stbadge st-'+st+'">'+st+'</span>'
+    // 習熟度と品詞は横並びにする（.type-q は縦フレックスなので、並べないと1段ずつ増える）
+    document.getElementById('tp-q').innerHTML='<span class="lvbadge '+lvCls(w.level)+'">'+lvL(w.level)+'</span>'
+      +'<div class="tp-badges"><span class="stbadge st-'+st+'">'+st+'</span>'
+      +'<span class="stbadge tp-pos">'+esc(w.pos)+'</span></div>'// 品詞。名詞か動詞かで答える形が変わるため
       +'<div class="word-main">'+esc(w.thai)+'</div>'+(showKana()?'<div class="word-sub">'+esc(w.kana)+'</div>':'')
       +spkBtn(w.thai,true)
       +'<div class="tp-hint" style="font-size:12px;color:var(--ink3);margin-top:12px">日本語で意味を入力</div>';
     setTimeout(()=>speak(w.thai),300);
   }else{
     document.getElementById('tp-q').innerHTML='<span class="lvbadge '+lvCls(w.level)+'">'+lvL(w.level)+'</span><span class="stbadge st-'+st+'">'+st+'</span>'
-      +'<div class="word-meaning">'+esc(w.meaning)+'</div>'
+      +'<div class="word-meaning">'+esc(w.meaning)+'</div><span class="pos-badge">'+esc(w.pos)+'</span>'
       +'<div class="tp-hint" style="font-size:12px;color:var(--ink3);margin-top:10px">タイ語をローマ字で入力</div>';
   }
   const inp=document.getElementById('tp-inp');inp.value='';inp.className='type-inp';inp.disabled=false;
