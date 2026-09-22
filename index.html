@@ -3229,6 +3229,7 @@ svg{display:block}
 .tp-ans-you{font-size:13px;color:var(--ink3);margin-top:6px;text-decoration:line-through}
 .tp-ans-v{font-size:18px;font-weight:700;color:var(--ink);margin-top:8px;line-height:1.55;word-break:break-word}
 .tp-ans-sub{font-size:12.5px;color:var(--ink3);margin-top:6px}
+.tp-ans-note{font-size:12px;color:var(--warn);font-weight:600;margin-top:6px}
 .tp-next{width:100%;padding:16px;border:none;border-radius:14px;background:var(--accent);color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-top:10px}
 /* 言い換えを自分で正解に訂正するボタン */
 .tp-ok-btn{width:100%;padding:13px;border:1.5px solid var(--good);border-radius:14px;background:transparent;color:var(--good);font-size:14px;font-weight:700;cursor:pointer;margin-top:10px}
@@ -3974,7 +3975,7 @@ function playWrong(){if(pref.sfx===false)return;_initSnd();try{_sndW.currentTime
 // 発音ボタン（onclick内のタイ語をJS文字列として安全にエスケープ）
 function spkBtn(thai,mt){return '<button class="spk" onclick="speak(\''+esc((thai||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'"))+'\')"'+(mt?' style="margin-top:12px"':'')+'><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L13 19V5L7.5 9.5z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg></button>';}
 const lvL=lv=>LVN[lv]||lv;
-const APP_VER='v85';// 表示用。sw.js の CACHE_VERSION と必ず揃えること
+const APP_VER='v86';// 表示用。sw.js の CACHE_VERSION と必ず揃えること
 const showKana=()=>pref.showKana!==false;// カタカナ読みを表示するか（既定:表示）
 // タイ語(.word-main)が長い場合、1行に収まるようフォントを自動縮小（折り返し防止）
 function fitWords(scope){
@@ -5076,7 +5077,7 @@ function typeIsCorrect(w,ans,aT){
     const cands=new Set();
     const feed=s=>ansVariants(s).forEach(v=>cands.add(v));
     feed(w.meaning);splitMeanings(w.meaning).forEach(feed);// 全体でも個別の意味でもOK
-    if(w.kana){feed(w.kana);splitMeanings(w.kana).forEach(feed);}
+    // カナ読みは正解にしない。聞いているのは意味なので、読み方を写せても意味を知った証拠にならない
     // 入力側も同じ正規化を通す（「私[男性]」のように注釈ごと写した場合も拾う）
     const mine=ansVariants(ans);
     return mine.length>0&&mine.some(v=>cands.has(v));
@@ -5657,19 +5658,30 @@ function checkType(){
   else if(!aT)setTimeout(()=>speak(w.thai),420);
 }
 // 答え合わせパネル。ovr=「やっぱり正解」で訂正した場合
+// 入力が「意味」ではなく「読み方」だったか（意味方向のときだけ見る）
+function typeIsReading(w,ans,aT){
+  if(!aT||!w.kana||!ans)return false;
+  const mine=ansVariants(ans);if(!mine.length)return false;
+  const cands=new Set();
+  ansVariants(w.kana).forEach(v=>cands.add(v));
+  splitMeanings(w.kana).forEach(x=>ansVariants(x).forEach(v=>cands.add(v)));
+  return mine.some(v=>cands.has(v));
+}
 function tpRenderAns(w,ok,ans,aT,ovr){
   const sub=aT?(showKana()&&w.kana?esc(w.kana):''):esc(w.roman||'');
+  const reading=!ok&&typeIsReading(w,ans,aT);// 読み方を書いてしまったとき
   document.getElementById('tp-res').innerHTML=
     '<div class="tp-ans'+(ok?' ok':'')+'">'
     +'<div class="tp-ans-l">'+(ok?(ovr?'正解にしました':'正解！'):'正解')+'</div>'
     // 自分の解答は「不正解（消し線）」と「訂正した（緑）」のときだけ出す
     +(ans&&(!ok||ovr)?'<div class="tp-ans-you'+(ovr?' kept':'')+'">'+esc(ans)+'</div>':'')
+    +(reading?'<div class="tp-ans-note">それは読み方です。意味を入力してください</div>':'')
     +'<div class="tp-ans-v">'+esc(aT?w.meaning:w.thai)+'</div>'
     +(sub?'<div class="tp-ans-sub">'+sub+'</div>':'')
     +(aT?'':spkBtn(w.thai,true))// 答えがタイ語のときは聞き直せるようにする
     +'</div>'
     // 「右折」＝「右に曲がる」のような言い換えは自動判定できないので自分で訂正できるようにする
-    +(!ok&&ans?'<button class="tp-ok-btn" onclick="typeMarkCorrect()">やっぱり正解にする</button>':'')
+    +(!ok&&ans&&!reading?'<button class="tp-ok-btn" onclick="typeMarkCorrect()">やっぱり正解にする</button>':'')
     +'<button class="tp-next" onclick="advance()">次へ →</button>';
 }
 // 不正解の判定を取り消して正解にする
