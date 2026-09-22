@@ -3374,6 +3374,11 @@ svg{display:block}
 .dict-search svg{color:var(--ink4);flex:none}
 .dict-search input{flex:1;border:none;outline:none;font-size:15px;background:none;color:var(--ink);min-width:0}
 .dict-clear{border:none;background:none;color:var(--ink4);font-size:18px;cursor:pointer;padding:0 2px;display:none}
+.dict-filters{display:flex;gap:7px;padding:0 16px 10px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.df{flex:none;font-family:inherit;font-size:12px;font-weight:600;color:var(--ink2);background:var(--surface);border:1.5px solid var(--bg2);border-radius:999px;padding:7px 12px;cursor:pointer;-webkit-appearance:none;appearance:none}
+.df:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.df.on{color:var(--accent);border-color:var(--accent);background:var(--accent-light)}
+.df-reset{flex:none;font-family:inherit;font-size:12px;font-weight:600;color:var(--ink3);background:none;border:none;padding:7px 4px;cursor:pointer;text-decoration:underline;display:none}
 .dict-cnt{font-size:11px;color:var(--ink4);padding:2px 18px 4px}
 .dict-list{padding:6px 16px 16px;display:flex;flex-direction:column;gap:10px}
 .dict-card{background:#fff;border:1px solid var(--bg2);border-radius:14px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
@@ -3686,6 +3691,13 @@ svg{display:block}
       <button class="dict-clear" id="dict-clear" onclick="dictClear()" aria-label="クリア">×</button>
     </div>
   </div>
+  <div class="dict-filters">
+    <select class="df" id="df-lv" onchange="dictSearch()" aria-label="級で絞り込む"></select>
+    <select class="df" id="df-pos" onchange="dictSearch()" aria-label="品詞で絞り込む"></select>
+    <select class="df" id="df-st" onchange="dictSearch()" aria-label="習熟度で絞り込む"></select>
+    <button class="df" id="df-bm" onclick="dictTogBM()" aria-pressed="false">☆ ブックマーク</button>
+    <button class="df-reset" id="df-reset" onclick="dictResetFilters()">クリア</button>
+  </div>
   <div class="dict-cnt" id="dict-cnt"></div>
   <div class="dict-list" id="dict-list"></div>
 </div>
@@ -3962,7 +3974,7 @@ function playWrong(){if(pref.sfx===false)return;_initSnd();try{_sndW.currentTime
 // 発音ボタン（onclick内のタイ語をJS文字列として安全にエスケープ）
 function spkBtn(thai,mt){return '<button class="spk" onclick="speak(\''+esc((thai||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'"))+'\')"'+(mt?' style="margin-top:12px"':'')+'><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L13 19V5L7.5 9.5z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg></button>';}
 const lvL=lv=>LVN[lv]||lv;
-const APP_VER='v84';// 表示用。sw.js の CACHE_VERSION と必ず揃えること
+const APP_VER='v85';// 表示用。sw.js の CACHE_VERSION と必ず揃えること
 const showKana=()=>pref.showKana!==false;// カタカナ読みを表示するか（既定:表示）
 // タイ語(.word-main)が長い場合、1行に収まるようフォントを自動縮小（折り返し防止）
 function fitWords(scope){
@@ -5111,7 +5123,46 @@ function dictScore(w,q){
   }
   return s;
 }
+// ── 辞書の絞り込み ────────────────────────────────────
+// 級・品詞・習熟度・ブックマーク。品詞は実データから作る（数詞や助詞など
+// POS 定数に無い値があり、固定リストだと一部の語に辿り着けなくなるため）
+let dictBMOnly=false;
+function buildDictFilters(){
+  const lv=document.getElementById('df-lv');if(!lv||lv.options.length)return;
+  lv.innerHTML='<option value="all">全レベル</option>'+LVS.map(v=>'<option value="'+v+'">'+lvL(v)+'</option>').join('');
+  const cnt={};RAW.forEach(w=>{cnt[w.pos]=(cnt[w.pos]||0)+1;});
+  const ps=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]);
+  document.getElementById('df-pos').innerHTML='<option value="all">全品詞</option>'
+    +ps.map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join('');
+  document.getElementById('df-st').innerHTML='<option value="all">全習熟度</option>'
+    +STL.slice().reverse().map(v=>'<option value="'+v+'">'+v+'</option>').join('')
+    +'<option value="未学習">未学習</option>';
+}
+function dictTogBM(){dictBMOnly=!dictBMOnly;dictSearch();}
+function dictResetFilters(){
+  dictBMOnly=false;
+  ['df-lv','df-pos','df-st'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='all';});
+  dictSearch();
+}
+function dictFilter(res){
+  const lv=document.getElementById('df-lv'),po=document.getElementById('df-pos'),st=document.getElementById('df-st');
+  const L=lv?lv.value:'all', P=po?po.value:'all', S=st?st.value:'all';
+  let out=res;
+  if(L!=='all')out=out.filter(w=>w.level===L);
+  if(P!=='all')out=out.filter(w=>w.pos===P);
+  if(S!=='all')out=out.filter(w=>S==='未学習'?!wSt[w.id]:(!!wSt[w.id]&&getSt(w.id)===S));
+  if(dictBMOnly)out=out.filter(w=>isBM(w.id));
+  // 絞り込み中は見て分かるようにする
+  [[lv,L],[po,P],[st,S]].forEach(([e,v])=>{if(e)e.classList.toggle('on',v!=='all');});
+  const bm=document.getElementById('df-bm');
+  if(bm){bm.classList.toggle('on',dictBMOnly);bm.setAttribute('aria-pressed',String(dictBMOnly));
+    bm.textContent=(dictBMOnly?'★':'☆')+' ブックマーク';}
+  const rs=document.getElementById('df-reset');
+  if(rs)rs.style.display=(L!=='all'||P!=='all'||S!=='all'||dictBMOnly)?'block':'none';
+  return out;
+}
 function dictSearch(){
+  buildDictFilters();
   const q=document.getElementById('dict-q').value.trim();
   document.getElementById('dict-clear').style.display=q?'block':'none';
   let res;
@@ -5122,13 +5173,16 @@ function dictSearch(){
     scored.sort((a,b)=>b[0]-a[0]);// 関連度の高い順（同点は元の順を維持＝安定ソート）
     res=scored.map(x=>x[1]);
   }
-  renderDictList(res,q);
+  renderDictList(dictFilter(res),q);
 }
 function renderDictList(res,q){
   const cnt=document.getElementById('dict-cnt'),list=document.getElementById('dict-list');
   if(!res.length){
     cnt.textContent='';
-    list.innerHTML='<div class="dict-empty">'+(q?'「'+esc(q)+'」に一致する単語はありません':'単語がありません')+'</div>';
+    const filt=document.getElementById('df-reset')&&document.getElementById('df-reset').style.display==='block';
+    list.innerHTML='<div class="dict-empty">'
+      +(q?'「'+esc(q)+'」に一致する単語はありません':(filt?'この絞り込みに当てはまる単語はありません':'単語がありません'))
+      +(filt?'<br>絞り込みを減らしてみてください':'')+'</div>';
     return;
   }
   cnt.textContent=res.length+'件'+(res.length>DICT_MAX?'（先頭'+DICT_MAX+'件を表示）':'');
