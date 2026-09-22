@@ -3962,7 +3962,7 @@ function playWrong(){if(pref.sfx===false)return;_initSnd();try{_sndW.currentTime
 // 発音ボタン（onclick内のタイ語をJS文字列として安全にエスケープ）
 function spkBtn(thai,mt){return '<button class="spk" onclick="speak(\''+esc((thai||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'"))+'\')"'+(mt?' style="margin-top:12px"':'')+'><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L13 19V5L7.5 9.5z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg></button>';}
 const lvL=lv=>LVN[lv]||lv;
-const APP_VER='v83';// 表示用。sw.js の CACHE_VERSION と必ず揃えること
+const APP_VER='v84';// 表示用。sw.js の CACHE_VERSION と必ず揃えること
 const showKana=()=>pref.showKana!==false;// カタカナ読みを表示するか（既定:表示）
 // タイ語(.word-main)が長い場合、1行に収まるようフォントを自動縮小（折り返し防止）
 function fitWords(scope){
@@ -4949,6 +4949,35 @@ const foldRoman=s=>(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase()
 // ── タイプ入力の正誤判定 ────────────────────────────────
 // 「答える、返事をする、返答する」に対し「答える」だけでも正解にする
 const splitMeanings=s=>(s||'').split(/[、,，\/／;；]/).map(x=>x.trim()).filter(Boolean);
+// ── 品詞の表示ラベル ──────────────────────────────────
+// 元データは語義が複数あっても品詞を1つしか持たない。「ネックレス、首飾り、悲しむ」が
+// 動詞だけになっていたので、意味の並びから品詞を拾って「名詞・動詞」のように併記する。
+// 語義が1つの語6,829件で元データと97%一致することを確認した推定
+const POS_BASE=['名詞','動詞','形容詞'];
+const _posKata=/^[ァ-ヶー・ｦ-ﾟ]+$/, _posKanji=/[一-鿿]/, _posPolite=/(です|ます)$/;
+const _posUVerb=/[買言使会合思歌洗習笑吸払通向扱養補奪覆漂狂争似沿担従伴添]/;
+const _posVEnd='るすくぐむぶつぬ';
+function posOfSense(s){
+  s=(s||'').replace(/[<＜〈\[［(（][^>＞〉\]］)）]*[>＞〉\]］)）]/g,'').replace(/[〜～]/g,'').trim();
+  if(!s)return null;
+  if(_posKata.test(s))return '名詞';        // 外来語はほぼ名詞
+  if(_posPolite.test(s))return null;        // 「そうです」等は手がかりにしない
+  const last=s[s.length-1];
+  if(_posVEnd.indexOf(last)>=0&&s.length>=2)return '動詞';
+  if(last==='う'&&s.length>=2&&_posUVerb.test(s))return '動詞';
+  // い終わりは形容詞。ただし漢字を含むか3文字以上（「はい」を弾く）
+  if(last==='い'&&s.length>=2&&'んっ'.indexOf(s[s.length-2])<0&&(_posKanji.test(s)||s.length>=3))return '形容詞';
+  if(last==='な'&&s.length>=3)return '形容詞';
+  return '名詞';
+}
+function posLabel(w){
+  const p=(w&&w.pos)||'';
+  if(POS_BASE.indexOf(p)<0)return p;        // 代名詞・接続詞などは元データのまま出す
+  const cnt={};
+  splitMeanings(w.meaning).forEach(x=>{const c=posOfSense(x);if(c)cnt[c]=(cnt[c]||0)+1;});
+  cnt[p]=(cnt[p]||0)+0.5;                   // 元データの品詞も候補として残す
+  return Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]||(a<b?-1:1)).slice(0,2).join('・');
+}
 // 漢字とかなの表記ゆれを同じ形に寄せる（「先程」＝「先ほど」）
 // 読みが一通りに定まる語だけを対象にする（中/方/様/位 などは複数の読みがあるため入れない）
 const JA_ORTH=[
@@ -5123,7 +5152,7 @@ function renderDictList(res,q){
       +'<div class="dict-mean">'+esc(w.meaning||'')+'</div>'
       +'<div class="dict-badges">'
         +'<span class="lvbadge '+lvCls(w.level)+'">'+lvL(w.level)+'</span>'
-        +'<span class="pos-badge">'+esc(w.pos||'')+'</span>'
+        +'<span class="pos-badge">'+esc(posLabel(w))+'</span>'
         +'<span class="stbadge st-'+st+'">'+st+'</span>'
       +'</div>'+ex+'</div>';
   }).join('');
@@ -5336,7 +5365,7 @@ function showCard(){
 
   const st=getSt(w.id);const aT=askThai(w);
   const bmBtn='';
-  const T=esc(w.thai),K=esc(w.kana),Rm=esc(w.roman),M=esc(w.meaning),P=esc(w.pos),SP=spkBtn(w.thai);
+  const T=esc(w.thai),K=esc(w.kana),Rm=esc(w.roman),M=esc(w.meaning),P=esc(posLabel(w)),SP=spkBtn(w.thai);
 
   if(aT){
     document.getElementById('ff-front').innerHTML=bmBtn
@@ -5470,7 +5499,7 @@ function showQz(){
     setTimeout(()=>speak(w.thai),300);
   }else{
     document.getElementById('qz-q').innerHTML='<span class="lvbadge '+lvCls(w.level)+'">'+lvL(w.level)+'</span><span class="stbadge st-'+st+'">'+st+'</span>'
-      +'<div class="word-meaning">'+esc(w.meaning)+'</div><span class="pos-badge">'+esc(w.pos)+'</span>'+bmBtn;
+      +'<div class="word-meaning">'+esc(w.meaning)+'</div><span class="pos-badge">'+esc(posLabel(w))+'</span>'+bmBtn;
   }
   const pool=RAW.filter(x=>x.id!==w.id&&x.pos===w.pos);
   const opts=shuf([w,...pickDistractors(w, pool, optCount(w), aT)]);
@@ -5529,14 +5558,14 @@ function showType(){
     // 習熟度と品詞は横並びにする（.type-q は縦フレックスなので、並べないと1段ずつ増える）
     document.getElementById('tp-q').innerHTML='<span class="lvbadge '+lvCls(w.level)+'">'+lvL(w.level)+'</span>'
       +'<div class="tp-badges"><span class="stbadge st-'+st+'">'+st+'</span>'
-      +'<span class="stbadge tp-pos">'+esc(w.pos)+'</span></div>'// 品詞。名詞か動詞かで答える形が変わるため
+      +'<span class="stbadge tp-pos">'+esc(posLabel(w))+'</span></div>'// 品詞。名詞か動詞かで答える形が変わるため
       +'<div class="word-main">'+esc(w.thai)+'</div>'+(showKana()?'<div class="word-sub">'+esc(w.kana)+'</div>':'')
       +spkBtn(w.thai,true)
       +'<div class="tp-hint" style="font-size:12px;color:var(--ink3);margin-top:12px">日本語で意味を入力</div>';
     setTimeout(()=>speak(w.thai),300);
   }else{
     document.getElementById('tp-q').innerHTML='<span class="lvbadge '+lvCls(w.level)+'">'+lvL(w.level)+'</span><span class="stbadge st-'+st+'">'+st+'</span>'
-      +'<div class="word-meaning">'+esc(w.meaning)+'</div><span class="pos-badge">'+esc(w.pos)+'</span>'
+      +'<div class="word-meaning">'+esc(w.meaning)+'</div><span class="pos-badge">'+esc(posLabel(w))+'</span>'
       +'<div class="tp-hint" style="font-size:12px;color:var(--ink3);margin-top:10px">タイ語をローマ字で入力</div>';
   }
   const inp=document.getElementById('tp-inp');inp.value='';inp.className='type-inp';inp.disabled=false;
