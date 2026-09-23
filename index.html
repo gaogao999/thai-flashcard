@@ -3734,7 +3734,10 @@ const CHS=20;
 
 // ── ストレージ ──────────────────────────────────────────
 const ls=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}};
-const ss=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}};
+// 保存に失敗したら（容量不足など）一度だけ知らせる。黙って失敗すると進捗が消えたことに気づけない
+let _saveWarned=false;
+function saveFail(){if(_saveWarned)return;_saveWarned=true;setTimeout(()=>alert('端末の保存容量が足りず、学習記録を保存できませんでした。\n設定の「バックアップを保存」で記録を書き出し、ブラウザの不要なデータを削除してください。'),0);}
+const ss=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{saveFail();}};
 // 単語データ(RAW)は大容量になるためIndexedDBに保存（localStorageの約5MB制限を回避）
 let _idb=null;
 function idbOpen(){
@@ -3773,14 +3776,21 @@ function calcStreak(){
   return s;
 }
 
-(()=>{
+// 日付が変わっていたら「今日」の記録を切り替える。起動時だけでなく、
+// 開いたまま0時をまたいだ場合に備えて記録・表示の直前にも確認する
+function rollDay(){
   const t=localDay();
-  if(slog.todayDate!==t){slog.todayDate=t;slog.todayIds=[];slog.todayLnd=0;ss('tap_slog',slog);}
+  if(!Array.isArray(slog.todayIds))slog.todayIds=[];
+  if(slog.todayDate===t)return false;
+  slog.todayDate=t;slog.todayIds=[];slog.todayLnd=0;ss('tap_slog',slog);strk.cur=calcStreak();return true;
+}
+(()=>{
+  rollDay();
   strk.cur=calcStreak();
 })();
 let _t0=0;let _active=false;// _t0=計測起点(0=非計測)、_active=学習セッション中か
 
-function save(){if(idbOK)idbSet('tap_raw',RAW).catch(()=>{});else ss('tap_raw',RAW);ss('tap_st',wSt);ss('tap_pre',wPre);ss('tap_streak',strk);ss('tap_slog',slog);ss('tap_pref',pref);}
+function save(){if(idbOK)idbSet('tap_raw',RAW).catch(saveFail);else ss('tap_raw',RAW);ss('tap_st',wSt);ss('tap_pre',wPre);ss('tap_streak',strk);ss('tap_slog',slog);ss('tap_pref',pref);}
 // 同梱辞書の版。words.json更新時にこの数字を上げると既存利用者も最新版に更新される
 const SEED_VER=6;
 // 同梱の辞書(words.json 約1.8万語)を読み込む。?vでSWの古いキャッシュを回避。失敗時はnull
@@ -3975,7 +3985,7 @@ function playWrong(){if(pref.sfx===false)return;_initSnd();try{_sndW.currentTime
 // 発音ボタン（onclick内のタイ語をJS文字列として安全にエスケープ）
 function spkBtn(thai,mt){return '<button class="spk" onclick="speak(\''+esc((thai||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'"))+'\')"'+(mt?' style="margin-top:12px"':'')+'><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L13 19V5L7.5 9.5z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg></button>';}
 const lvL=lv=>LVN[lv]||lv;
-const APP_VER='v86';// 表示用。sw.js の CACHE_VERSION と必ず揃えること
+const APP_VER='v87';// 表示用。sw.js の CACHE_VERSION と必ず揃えること
 const showKana=()=>pref.showKana!==false;// カタカナ読みを表示するか（既定:表示）
 // タイ語(.word-main)が長い場合、1行に収まるようフォントを自動縮小（折り返し防止）
 function fitWords(scope){
@@ -4102,6 +4112,7 @@ function speedOf(ms,fmt){
 // 「次は4択で確かめる」ための通過印(g2)だけ立てて翌日また出す
 // ms/fmt を渡すと回答の速さも間隔に効かせる（省略時は従来どおり）
 function updSt(w,ok,kind,weak,ms,fmt){
+  rollDay();
   const T=masterT();const cur=wSt[w.id]||{};const before=cur.status||STL[0];
   // 復習を何問こなしたか。まとめて新語を出すサイクルの進捗に使う（新出は数えない）。
   // 1回ぶん＋セッション1回のはみ出しで頭打ちにする。青天井にすると、
@@ -4535,7 +4546,7 @@ function planFor(w){
   const sh=sessShift;
   if(sh>0){                       // 難しく：2択→4択、4択→タイプ
     if(p.fmt==='quiz'&&p.opts===2)p={fmt:'quiz',aT:p.aT,opts:4};
-    else if(p.fmt==='quiz')       p={fmt:'type',aT:p.aT,opts:4};
+    else if(p.fmt==='quiz'&&s.last)p={fmt:'type',aT:p.aT,opts:4};// 初出の語はタイプにしない（見たことのない語は書けない）
   }else if(sh<0){                 // 易しく：タイプ/並替→4択（2択までは落とさない）
     if(p.fmt!=='quiz')            p={fmt:'quiz',aT:p.aT,opts:4};
   }
@@ -4860,6 +4871,7 @@ function parseCSV(txt){
 }
 function loadCSV(e){
   const file=e.target.files[0];if(!file)return;
+  if(!confirm('CSVを読み込むと、今の単語と学習の進捗はすべて消えます。\n（先に設定の「バックアップを保存」をおすすめします）\nよろしいですか？')){e.target.value='';return;}
   const r=new FileReader();
   r.onload=ev=>{
     try{
@@ -4885,6 +4897,7 @@ function loadCSV(e){
       csvSt(''+RAW.length+'件 完了！',true);renderHome();
     }catch(err){csvSt(''+err.message,false);}
   };r.readAsText(file,'UTF-8');
+  e.target.value='';
 }
 function csvSt(msg,ok){const el=document.getElementById('csv-st');el.style.color=ok?'var(--good)':'var(--bad)';el.textContent=msg;}
 
@@ -4933,11 +4946,19 @@ function importMD(e){
       RAW=data.raw;assignLevels(RAW);// レベルはスコアから再導出し、ファイル側の値は使わない
       if(data.st&&typeof data.st==='object')wSt=data.st;
       wPre=(data.pre&&typeof data.pre==='object')?data.pre:{};
-      if(data.streak&&typeof data.streak==='object')strk=data.streak;
-      if(data.slog&&typeof data.slog==='object')slog=data.slog;
-      if(data.pref&&typeof data.pref==='object')pref=data.pref;
-      migrateSched();// 旧バックアップには復習予定が無いので付与する
-      pref.repairV=0;repairIvl();// 復元データも巻き戻りを含みうるので直す
+      // 古いバックアップには後から増えた項目が無いので、既定値で補ってから使う
+      if(data.streak&&typeof data.streak==='object')strk=Object.assign({dates:[],best:0,cur:0},data.streak);
+      if(!Array.isArray(strk.dates))strk.dates=[];
+      if(data.slog&&typeof data.slog==='object')slog=Object.assign({sec:0,words:0,todayIds:[],todayDate:'',wkData:{}},data.slog);
+      if(!slog.wkData||typeof slog.wkData!=='object')slog.wkData={};
+      if(data.pref&&typeof data.pref==='object')pref=Object.assign({goal:20,timer:0,bm:[]},data.pref,{onboarded:true});
+      if(!Array.isArray(pref.bm))pref.bm=[];
+      rollDay();
+      // 旧形式の記録が混ざっていれば必ず移行する（移行済みの語は触らない）
+      pref.schedV=0;migrateSched();
+      // 巻き戻りの修復は、修復前に作られたバックアップのときだけ行う。
+      // 毎回やり直すと、その後に本当に忘れて短くなった予定まで引き上げてしまう
+      repairIvl();
       save();
       const wc=document.getElementById('word-cnt');if(wc)wc.textContent=RAW.length;
       bkSt('復元しました（'+RAW.length+'件）',true);
@@ -5222,6 +5243,7 @@ function dictBM(btn){const id=btn.dataset.id;if(isBM(id))pref.bm=pref.bm.filter(
 
 // ── ホーム ──────────────────────────────────────────────
 function renderHome(){
+  rollDay();
   const tot=RAW.length,lnd=totLnd(),pct=tot>0?Math.round(lnd/tot*100):0;
   document.getElementById('hero-pct').textContent=pct+'%';
   document.getElementById('hero-fill').style.width=pct+'%';
@@ -5347,6 +5369,9 @@ function forceUpdate(row){
   const lbl=document.getElementById('s-upd');if(lbl)lbl.textContent='確認中…';
   const done=()=>location.reload();
   (async()=>{
+    // 先に最新版へ届くか確かめる。オフラインでキャッシュを消すとアプリが開けなくなるため
+    try{const r=await fetch('index.html?u='+Date.now(),{cache:'no-store'});if(!r.ok)throw 0;}
+    catch(e){if(lbl)lbl.textContent='›';alert('インターネットに接続できないため更新できません。\n電波のある場所でもう一度お試しください。');return;}
     try{
       if('serviceWorker' in navigator){
         const rs=await navigator.serviceWorker.getRegistrations();
@@ -6004,7 +6029,7 @@ function renderDash(){
 if(speechSynthesis.onvoiceschanged!==undefined)speechSynthesis.onvoiceschanged=()=>{};
 window.addEventListener('beforeunload',bumpSec);
 // タブを隠したら計測を一時停止（隠れている間は数えない）。戻ったら起点をリセットして再開
-window.addEventListener('visibilitychange',()=>{if(document.hidden){bumpSec();_t0=0;}else if(_active){_t0=Date.now();}});
+window.addEventListener('visibilitychange',()=>{if(document.hidden){bumpSec();_t0=0;}else{if(_active)_t0=Date.now();else if(rollDay())renderHome();}});
 // ── タイプ入力時のキーボードずれ対策（iOS）─────────────────
 // iOSはキーボードを出すとページ全体を勝手にスクロールし、上の問題文が隠れる。
 // キーボード中だけ本文の高さを表示領域(visualViewport)に合わせ、スクロールを封じて防ぐ。
