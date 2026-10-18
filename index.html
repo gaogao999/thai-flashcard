@@ -389,6 +389,8 @@ svg{display:block}
 .dict-acts{display:flex;gap:6px;flex:none}
 .dict-iconbtn{padding:7px;border:1.5px solid var(--accent-light);border-radius:50%;background:transparent;cursor:pointer;color:var(--accent);display:inline-flex;align-items:center;justify-content:center;flex:none}
 .spk-ic path{transition:opacity .15s}
+.toast{position:fixed;left:16px;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:9999;background:var(--ink);color:#fff;font-size:13px;line-height:1.5;padding:12px 14px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.18);opacity:0;transform:translateY(8px);transition:opacity .2s,transform .2s;pointer-events:none}
+.toast.show{opacity:1;transform:none}
 .speaking .spk-ic .w2{animation:spkW2 .9s infinite}
 .speaking .spk-ic .w3{animation:spkW3 .9s infinite}
 @keyframes spkW2{0%,32%{opacity:.12}33%,100%{opacity:1}}
@@ -956,14 +958,54 @@ function pickDistractors(w, pool3, want, aT){
 
 const shuf=a=>{const b=[...a];for(let i=b.length-1;i>0;i--){const j=0|Math.random()*(i+1);[b[i],b[j]]=[b[j],b[i]];}return b;};
 // onEnd を渡すと読み上げ終了時に呼ばれる（音声が使えない環境では即座に呼ぶ）
+// iOS Safari の読み上げは不安定なので次の点に気をつける：
+// ・cancel() の直後に speak() すると無音で捨てられることがある → 再生中のときだけ止め、少し間を置いて話す
+// ・アプリを切り替えると一時停止のまま固まることがある → 毎回 resume() する
+// ・発話オブジェクトが途中で回収されると止まる → 参照を持っておく
+// ・それでも始まらないことがある → 始まらなければ一度だけやり直し、だめなら案内を出す
+let _utt=null,_thVoice=null,_spkSeq=0,_spkHinted=false;
+function thaiVoice(){
+  if(_thVoice)return _thVoice;
+  try{_thVoice=speechSynthesis.getVoices().find(x=>/^th([-_]|$)/i.test(x.lang))||null;}catch{}
+  return _thVoice;
+}
+function spkHint(){
+  if(_spkHinted)return;_spkHinted=true;
+  toast('音声が再生されませんでした。マナーモード（消音）を解除し、音量を上げてからもう一度お試しください');
+}
 function speak(t,onEnd){
   const fin=(()=>{let done=false;return()=>{if(done)return;done=true;if(onEnd)onEnd();};})();
-  if(!window.speechSynthesis||!t){fin();return;}
-  speechSynthesis.cancel();
-  const u=new SpeechSynthesisUtterance(t);u.lang='th-TH';u.rate=.85;
-  const v=speechSynthesis.getVoices().find(x=>x.lang==='th-TH'||x.lang==='th');if(v)u.voice=v;
-  u.onend=fin;u.onerror=fin;
-  speechSynthesis.speak(u);
+  const S=window.speechSynthesis;
+  if(!S||!t||typeof SpeechSynthesisUtterance==='undefined'){fin();return;}
+  const seq=++_spkSeq;
+  const say=(retry)=>{
+    if(seq!==_spkSeq){fin();return;}// 次の読み上げが始まった
+    const u=new SpeechSynthesisUtterance(t);u.lang='th-TH';u.rate=.85;u.volume=1;
+    const v=thaiVoice();if(v)u.voice=v;
+    let started=false;
+    u.onstart=()=>{started=true;};
+    u.onend=fin;
+    u.onerror=e=>{const er=e&&e.error;
+      if(er&&er!=='interrupted'&&er!=='canceled'&&seq===_spkSeq)spkHint();
+      fin();};
+    _utt=u;
+    try{S.resume();}catch{}
+    S.speak(u);
+    setTimeout(()=>{
+      if(started||seq!==_spkSeq)return;
+      if(!retry){try{S.cancel();}catch{}setTimeout(()=>say(true),120);}// 固まっていたら一度だけやり直す
+      else{spkHint();fin();}
+    },retry?2500:1500);
+  };
+  if(S.speaking||S.pending){try{S.cancel();}catch{}setTimeout(()=>say(false),80);}
+  else say(false);
+}
+// 画面下に短く出す案内
+function toast(msg){
+  let el=document.getElementById('toast');
+  if(!el){el=document.createElement('div');el.id='toast';el.className='toast';document.body.appendChild(el);}
+  el.textContent=msg;el.classList.add('show');
+  clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),4500);
 }
 // 発音ボタンのスピーカー。音の波を3本にして、再生中は1本→2本→3本と増える動きで知らせる
 function spkSvg(sz){return '<svg class="spk-ic" width="'+sz+'" height="'+sz+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5v5h3.5L12 19V5L6.5 9.5z"/><path class="w1" d="M14.8 10.3a2.4 2.4 0 0 1 0 3.4"/><path class="w2" d="M17 8.1a5.4 5.4 0 0 1 0 7.8"/><path class="w3" d="M19.2 5.9a8.4 8.4 0 0 1 0 12.2"/></svg>';}
@@ -978,7 +1020,7 @@ function speakBtn(btn,t){
   cap=setTimeout(off,Math.min(15000,2000+(t||'').length*250));
   speak(t,off);
 }
-function stopSpeak(){if(window.speechSynthesis)speechSynthesis.cancel();}
+function stopSpeak(){_spkSeq++;if(window.speechSynthesis)speechSynthesis.cancel();}
 // ── 効果音（WAVを合成しHTMLAudioで再生：iOSでWeb Audioより鳴りやすい）──
 const _SR=22050;
 function _synthWav(notes,dur){// notes:[{f,start,len,gain,type}]
@@ -1007,7 +1049,7 @@ function playWrong(){if(pref.sfx===false)return;_initSnd();try{_sndW.currentTime
 // 発音ボタン（onclick内のタイ語をJS文字列として安全にエスケープ）
 function spkBtn(thai,mt){return '<button class="spk" onclick="speakBtn(this,\''+esc((thai||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'"))+'\')"'+(mt?' style="margin-top:12px"':'')+'>'+spkSvg(14)+'</button>';}
 const lvL=lv=>LVN[lv]||lv;
-const APP_VER='v90';// 表示用。sw.js の CACHE_VERSION と必ず揃えること
+const APP_VER='v91';// 表示用。sw.js の CACHE_VERSION と必ず揃えること
 const showKana=()=>pref.showKana!==false;// カタカナ読みを表示するか（既定:表示）
 // タイ語(.word-main)が長い場合、1行に収まるようフォントを自動縮小（折り返し防止）
 function fitWords(scope){
@@ -3084,7 +3126,7 @@ function renderDash(){
 }
 
 // ── 初期化 ──────────────────────────────────────────────
-if(speechSynthesis.onvoiceschanged!==undefined)speechSynthesis.onvoiceschanged=()=>{};
+if(window.speechSynthesis&&speechSynthesis.onvoiceschanged!==undefined)speechSynthesis.onvoiceschanged=()=>{_thVoice=null;thaiVoice();};
 window.addEventListener('beforeunload',()=>{bumpSec();flushSave();});
 window.addEventListener('pagehide',flushSave);
 // タブを隠したら計測を一時停止（隠れている間は数えない）。戻ったら起点をリセットして再開
