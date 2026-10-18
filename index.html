@@ -956,10 +956,14 @@ function pickDistractors(w, pool3, want, aT){
 
 const shuf=a=>{const b=[...a];for(let i=b.length-1;i>0;i--){const j=0|Math.random()*(i+1);[b[i],b[j]]=[b[j],b[i]];}return b;};
 // onEnd を渡すと読み上げ終了時に呼ばれる（音声が使えない環境では即座に呼ぶ）
+// iOS Safari は既定で、マナーモード（消音スイッチ）中は読み上げを無音にする。
+// 対応している端末では音声セッションを「再生」にして、読み上げの間だけ消音を無視させる（非対応なら何もしない）
+function setAudioSession(type){try{if(navigator.audioSession)navigator.audioSession.type=type;}catch{}}
 function speak(t,onEnd){
-  const fin=(()=>{let done=false;return()=>{if(done)return;done=true;if(onEnd)onEnd();};})();
+  const fin=(()=>{let done=false;return()=>{if(done)return;done=true;setAudioSession('auto');if(onEnd)onEnd();};})();
   if(!window.speechSynthesis||!t){fin();return;}
   speechSynthesis.cancel();
+  setAudioSession('playback');
   const u=new SpeechSynthesisUtterance(t);u.lang='th-TH';u.rate=.85;
   const v=speechSynthesis.getVoices().find(x=>x.lang==='th-TH'||x.lang==='th');if(v)u.voice=v;
   u.onend=fin;u.onerror=fin;
@@ -1007,7 +1011,7 @@ function playWrong(){if(pref.sfx===false)return;_initSnd();try{_sndW.currentTime
 // 発音ボタン（onclick内のタイ語をJS文字列として安全にエスケープ）
 function spkBtn(thai,mt){return '<button class="spk" onclick="speakBtn(this,\''+esc((thai||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'"))+'\')"'+(mt?' style="margin-top:12px"':'')+'>'+spkSvg(14)+'</button>';}
 const lvL=lv=>LVN[lv]||lv;
-const APP_VER='v93';// 表示用。sw.js の CACHE_VERSION と必ず揃えること
+const APP_VER='v94';// 表示用。sw.js の CACHE_VERSION と必ず揃えること
 const showKana=()=>pref.showKana!==false;// カタカナ読みを表示するか（既定:表示）
 // タイ語(.word-main)が長い場合、1行に収まるようフォントを自動縮小（折り返し防止）
 function fitWords(scope){
